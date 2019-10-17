@@ -36,6 +36,10 @@ public:
 	{
 		_split(0, 0, _w, _h);
 	}
+	void generateFractal()
+	{
+		_fractal(16, 16, 16);
+	}
 	void print()
 	{
 		for (int j = 0; j < _h; j++)
@@ -173,12 +177,18 @@ public:
 		for (iterator it(*this, 0, 0, 0); it.more(); it.next())
 			if (it.turn() == 0)
 				count++;
-		printf("%d == %d\n", count, 2*(_w*_h - 1));
+		//printf("%d == %d\n", count, 2*(_w*_h - 1));
 		return count == 2*(_w*_h - 1);
 	}
 	
-	void svg(FILE *f, double wall_width, double hall_width, const char *color, double stroke_width)
+	void svg(const char *filename, double wall_width, double hall_width, const char *color, double stroke_width)
 	{
+		FILE *f = fopen(filename, "wt");
+		if (f == 0)
+		{
+			fprintf(stderr, "Cannot open file '%s' for writing\n", filename);
+			return;
+		}
 		fprintf(f, "<svg width=\"%.0f\" height=\"%.0f\" xmlns=\"http://www.w3.org/2000/svg\">\n",
 				(wall_width+hall_width)*(_w+1), (wall_width+hall_width)*(_h+1));
 		fprintf(f, "<path d=\"M%.2lf %.2lf\n", hall_width/2, hall_width/2);
@@ -201,6 +211,7 @@ public:
 					 (hall_width + wall_width)*(it.j()+1) + hall_width/2*((it.d() == 0 || it.d() == 3) ? -1 : 1));
 		}
 		fprintf(f, "\" stroke=\"%s\" stroke-width=\"%.2lf\" fill-opacity=\"0.0\"/></svg>\n", color, stroke_width);
+		fclose(f);
 	}
 public:		
 	/*
@@ -316,6 +327,24 @@ private:
 		}
 		_depth--;
 	}
+
+	void _fractal(int i, int j, int size)
+	{
+		int d = rand() % 4;
+		if (d != 0) top(i + rand()%size, j) = false;
+		if (d != 1) left(i, j-1 - rand()%size) = false;
+		if (d != 2) top(i-1 - rand()%size, j) = false;
+		if (d != 3) left(i, j + rand()%size) = false;
+		
+		if (size == 1)
+			return;
+		size /= 2;
+		_fractal(i - size, j - size, size);
+		_fractal(i + size, j - size, size);
+		_fractal(i + size, j + size, size);
+		_fractal(i - size, j + size, size);
+	}
+
 	int _w, _h;
 	bool *_vert, *_horz;
 };
@@ -323,16 +352,14 @@ private:
 int main(int argc, char *argv[])
 {
 	//srand(time(0));
-	Maze maze(20, 20);
+	Maze maze(32, 32);
 	//maze.generateRecursive();
-	maze.generateSplit();
-	maze.print();
-	maze.removeCrosses();
+	//maze.removeCrosses();
+	//maze.generateSplit();
+	maze.generateFractal();
 	maze.print();
 	if (!maze.check())
 		printf("Incorrect\n");
-	FILE *f = fopen("Maze.svg", "wt");
-	maze.svg(f, 2, 8, "red", 1);
-	fclose(f);
+	maze.svg("Maze.svg", 2, 8, "red", 1);
 	//maze.dump();
 }
