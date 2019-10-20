@@ -36,9 +36,10 @@ public:
 	{
 		_split(0, 0, _w, _h);
 	}
-	void generateFractal()
+	enum frac_type { frac_regular, frac_random_orient_no_cross, frac_random_orient, frac_all_random };
+	void generateFractal(frac_type type)
 	{
-		_fractal(16, 16, 16);
+		_fractal(16, 16, 16, type, -1);
 	}
 	void print()
 	{
@@ -54,6 +55,44 @@ public:
 		for (int i = 0; i < _w; i++)
 			printf("+-");
 		printf("+\n");
+	}
+	void printStats()
+	{
+		int types[16];
+		for (int i = 0; i < 16; i++)
+			types[i] = 0;
+		for (int i = 0; i < _w; i++)
+			for (int j = 0; j < _h; j++)
+				types[  (_hasWall(i, j, 0) ? 0 : 1)
+				      | (_hasWall(i, j, 1) ? 0 : 2)
+				      | (_hasWall(i, j, 2) ? 0 : 4)
+				      | (_hasWall(i, j, 3) ? 0 : 8)]++;
+		for (int i = 0; i < 16; i++)
+			if (types[i] > 0)
+			{
+				printf(" ");
+				for (int d = 0; d < 4; d++)
+					if ((i & (1 << d)) != 0)
+						printf("%c", "rblt"[d]);
+				printf(":%d", types[i]);
+			}
+		printf("\n");
+		printf("degree 1: %d\n", types[1] + types[2] + types[4] + types[8]);
+		int two_straight = types[1+4] + types[2 + 8];
+		int two_turn = types[1 + 2] + types[2 + 4] + types[4 + 8] + types[8 + 1];
+		if (two_straight + two_turn > 0)
+		{
+			printf("degree 2: %d", two_straight + two_turn);
+			if (two_straight > 0)
+				printf(" straight:%d", two_straight);
+			if (two_turn > 0)
+				printf(" turn:%d", two_turn);
+			printf("\n");
+		}
+		int three = types[1 + 2 + 4] + types[2 + 4 + 8] + types [4 + 8 + 1] + types[8 + 1 + 2];
+		printf("degree 3: %d\n", three);
+		if (types[1 + 2 + 4 + 8])
+			printf("degree 4: %d\n", types[1 + 2 + 4 + 8]);
 	}
 	void dump()
 	{
@@ -328,21 +367,28 @@ private:
 		_depth--;
 	}
 
-	void _fractal(int i, int j, int size)
+	void _fractal(int i, int j, int size, frac_type ft, int avoid_corner)
 	{
-		int d = rand() % 4;
-		if (d != 0) top(i + rand()%size, j) = false;
-		if (d != 1) left(i, j-1 - rand()%size) = false;
-		if (d != 2) top(i-1 - rand()%size, j) = false;
-		if (d != 3) left(i, j + rand()%size) = false;
+		int d;
+		switch (ft)
+		{
+			case frac_regular:					d = 1; break;
+			case frac_random_orient_no_cross:   d = (avoid_corner + 3 + rand() % 2) % 4; break;
+			case frac_random_orient:
+			case frac_all_random:				d = rand() % 4; break;
+		}
+		if (d != 0) top(i + (ft == frac_all_random ? rand()%size : 0), j) = false;
+		if (d != 1) left(i, j + (ft == frac_all_random ? rand()%size : 0)) = false;
+		if (d != 2) top(i-1 - (ft == frac_all_random ? rand()%size : 0), j) = false;
+		if (d != 3) left(i, j-1 - (ft == frac_all_random ? rand()%size : 0)) = false;
 		
 		if (size == 1)
 			return;
 		size /= 2;
-		_fractal(i - size, j - size, size);
-		_fractal(i + size, j - size, size);
-		_fractal(i + size, j + size, size);
-		_fractal(i - size, j + size, size);
+		_fractal(i + size, j - size, size, ft, avoid_corner == 0 ? 0 : (d == 1 || d == 2) ? 2 : -1);
+		_fractal(i + size, j + size, size, ft, avoid_corner == 1 ? 1 : (d == 2 || d == 3) ? 3 : -1);
+		_fractal(i - size, j + size, size, ft, avoid_corner == 2 ? 2 : (d == 3 || d == 0) ? 0 : -1);
+		_fractal(i - size, j - size, size, ft, avoid_corner == 3 ? 3 : (d == 0 || d == 1) ? 1 : -1);
 	}
 
 	int _w, _h;
@@ -356,8 +402,12 @@ int main(int argc, char *argv[])
 	//maze.generateRecursive();
 	//maze.removeCrosses();
 	//maze.generateSplit();
-	maze.generateFractal();
+	//maze.generateFractal(Maze::frac_regular);
+	//maze.generateFractal(Maze::frac_random_orient_no_cross);
+	//maze.generateFractal(Maze::frac_random_orient);
+	maze.generateFractal(Maze::frac_all_random);
 	maze.print();
+	maze.printStats();
 	if (!maze.check())
 		printf("Incorrect\n");
 	maze.svg("Maze.svg", 2, 8, "red", 1);
