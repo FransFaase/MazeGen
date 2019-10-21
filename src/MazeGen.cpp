@@ -36,7 +36,7 @@ public:
 	{
 		_split(0, 0, _w, _h);
 	}
-	enum frac_type { frac_regular, frac_random_orient_no_cross, frac_random_orient, frac_all_random };
+	enum frac_type { frac_regular, frac_reverse, frac_random_orient_no_cross, frac_reverse_random_orient_no_cross, frac_random_orient, frac_all_random };
 	void generateFractal(frac_type type)
 	{
 		generateFractal(_w/2, _h/2, type);
@@ -405,9 +405,11 @@ private:
 		{
 			switch (ft)
 			{
-				case frac_regular:					d = 1; break;
+				case frac_regular:
+				case frac_reverse:					d = 1; break;
 				case frac_random_orient_no_cross:   d = (avoid_corner + 3 + rand() % 2) % 4; break;
 				case frac_random_orient:
+				case frac_reverse_random_orient_no_cross:
 				case frac_all_random:				d = rand() % 4; break;
 			}
 			if (d != 0) top(_left_range(i, size, ft), j) = false;
@@ -428,29 +430,33 @@ private:
 	int _left_range(int i, int size, frac_type ft)
 	{
 		int min = i < 0 ? 0 : i;
-		if (ft != frac_all_random) return min;
 		int max = (i + size < _w ? i + size : _w) - 1;
+		if (ft == frac_reverse || ft == frac_reverse_random_orient_no_cross) return max;
+		if (ft != frac_all_random) return min;
 		return min + (min < max ? rand()%(max+1 - min) : 0);
 	}
 	int _right_range(int i, int size, frac_type ft)
 	{
-		int max = (i < _w ? i : _w) - 1;
+		int max = (i > _w ? _w : i) - 1;
+		int min = i - size > 0 ? i - size : 0;
+		if (ft == frac_reverse || ft == frac_reverse_random_orient_no_cross) return min;
 		if (ft != frac_all_random) return max;
-		int min = i - size < 0 ? 0 : i - size;
 		return min + (min < max ? rand()%(max+1 - min) : 0);
 	}
 	int _bottom_range(int j, int size, frac_type ft)
 	{
 		int min = j < 0 ? 0 : j;
-		if (ft != frac_all_random) return min;
 		int max = (j + size < _h ? j + size : _h) - 1;
+		if (ft == frac_reverse || ft == frac_reverse_random_orient_no_cross) return max;
+		if (ft != frac_all_random) return min;
 		return min + (min < max ? rand()%(max+1 - min) : 0);
 	}
 	int _top_range(int j, int size, frac_type ft)
 	{
 		int max = (j < _h ? j : _h) - 1;
-		if (ft != frac_all_random) return max;
 		int min = j - size < 0 ? 0 : j - size;
+		if (ft == frac_reverse || ft == frac_reverse_random_orient_no_cross) return min;
+		if (ft != frac_all_random) return max;
 		return min + (min < max ? rand()%(max+1 - min) : 0);
 	}
 
@@ -466,9 +472,10 @@ int main(int argc, char *argv[])
 	//maze.removeCrosses();
 	//maze.generateSplit();
 	//maze.generateFractal(Maze::frac_regular);
+	maze.generateFractal(Maze::frac_reverse_random_orient_no_cross);
 	//maze.generateFractal(Maze::frac_random_orient_no_cross);
 	//maze.generateFractal(Maze::frac_random_orient);
-	maze.generateFractal(Maze::frac_all_random);
+	//maze.generateFractal(Maze::frac_all_random);
 	maze.print();
 	maze.printStats();
 	if (!maze.check())
