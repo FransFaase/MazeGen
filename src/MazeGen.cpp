@@ -4,25 +4,27 @@
 
 class Maze
 {
+private:
+	enum state { s_wall, s_passage, s_undefined };
 public:
 	Maze(int w, int h) : _w(w), _h(h), _depth(0)
 	{
-		_vert = new bool[(w-1)*h];
+		_vert = new state[(w-1)*h];
 		for (int i = 0; i < (w-1)*h; i++)
-			_vert[i] = true;
-		_horz = new bool[w*(h-1)];
+			_vert[i] = s_undefined;
+		_horz = new state[w*(h-1)];
 		for (int i = 0; i < w*(h-1); i++)
-			_horz[i] = true;
+			_horz[i] = s_undefined;
 	}
 	~Maze()
 	{
 		delete[] _vert;
 		delete[] _horz;
 	}
-	bool &right(int i, int j) { /*printf("right(%d,%d)\n", i, j);*/return _vert[_h*i + j]; }
-	bool &left(int i, int j) { /*printf("left(%d,%d)\n", i, j);*/return _vert[_h*(i-1) + j]; }
-	bool &bottom(int i, int j) { /*printf("bottom(%d,%d)\n", i, j);*/return _horz[i + _w*j]; }
-	bool &top(int i, int j) { /*printf("top(%d,%d)\n", i, j);*/return _horz[i + _w*(j-1)]; }
+	state &right(int i, int j) { /*printf("right(%d,%d)\n", i, j);*/return _vert[_h*i + j]; }
+	state &left(int i, int j) { /*printf("left(%d,%d)\n", i, j);*/return _vert[_h*(i-1) + j]; }
+	state &bottom(int i, int j) { /*printf("bottom(%d,%d)\n", i, j);*/return _horz[i + _w*j]; }
+	state &top(int i, int j) { /*printf("top(%d,%d)\n", i, j);*/return _horz[i + _w*(j-1)]; }
 
 	void generateRecursive()
 	{
@@ -31,10 +33,12 @@ public:
 			visited[i] = false;
 		_recurse(0, 0, visited);
 		delete[] visited;
+		_undefinedToWall();
 	}
 	void generateSplit()
 	{
 		_split(0, 0, _w, _h);
+		_undefinedToWall();
 	}
 	enum frac_type { frac_regular, frac_reverse, frac_random_orient_no_cross, frac_reverse_random_orient_no_cross, frac_random_orient, frac_all_random };
 	void generateFractal(frac_type type)
@@ -48,6 +52,7 @@ public:
 		       || j - size > 0 || j + size < _w-1)
 			size *= 2;
 		_fractal(i, j, size, type, -1);
+		_undefinedToWall();
 	}
 	void print()
 	{
@@ -182,7 +187,7 @@ public:
 				if (0 <= j && j < _h && _nrWalls(i, j) == 0)
 				{
 					printf("Cross at %d, %d\n", i, j);
-					top(i, j) = true;
+					top(i, j) = s_wall;
 					printf("%d %d %d %d\n", right(i,j), bottom(i,j), left(i,j), top(i,j));
 					int min_k = k;
 					int best_i = i, best_j = j;
@@ -212,9 +217,9 @@ public:
 						printf(" Found min %d,%d\n", best_i, best_j);
 					}
 					if (best_j > 0)
-						top(best_i, best_j) = false;
+						top(best_i, best_j) = s_passage;
 					else
-						left(best_i, best_j) = false;
+						left(best_i, best_j) = s_passage;
 				}
 	}
 		
@@ -275,10 +280,10 @@ private:
 	{
 		switch((d+4)%4)
 		{
-			case 0: return i >= _w-1 || right(i, j);
-			case 1: return j >= _h-1 || bottom(i, j);
-			case 2: return i <= 0    || left(i, j);
-			case 3: return j <= 0    || top(i, j);
+			case 0: return i >= _w-1 || right(i, j) == s_wall;
+			case 1: return j >= _h-1 || bottom(i, j) == s_wall;
+			case 2: return i <= 0    || left(i, j) == s_wall;
+			case 3: return j <= 0    || top(i, j) == s_wall;
 		}
 		return true;
 	}
@@ -293,6 +298,15 @@ private:
 	bool _notVisited(int i, int j, bool *visited)
 	{
 		return 0 <= i && i < _w && 0 <= j && j < _h && !visited[i + _w*j];
+	}
+	void _undefinedToWall()
+	{
+		for (int i = 0; i < (_w-1)*_h; i++)
+			if (_vert[i] == s_undefined)
+				_vert[i] = s_wall;
+		for (int i = 0; i < _w*(_h-1); i++)
+			if (_horz[i] == s_undefined)
+				_horz[i] = s_wall;
 	}
 	void _recurse(int i, int j, bool *visited)
 	{
@@ -312,23 +326,23 @@ private:
 			//printf("      %d,%d %d, %d\n", i, j, c, r);
 			if (_notVisited(i-1, j, visited) && r-- == 0)
 			{
-				left(i, j) = false;
+				left(i, j) = s_passage;
 				_recurse(i-1, j, visited);
 				
 			}
 			else if (_notVisited(i, j-1, visited) && r-- == 0)
 			{
-				top(i, j) = false;
+				top(i, j) = s_passage;
 				_recurse(i, j-1, visited);
 			}
 			else if (_notVisited(i+1, j, visited) && r-- == 0)
 			{
-				right(i, j) = false;
+				right(i, j) = s_passage;
 				_recurse(i+1, j, visited);
 			}
 			else if (_notVisited(i, j+1, visited) && r-- == 0)
 			{
-				bottom(i, j) = false;
+				bottom(i, j) = s_passage;
 				_recurse(i, j+1, visited);
 			}
 		}
@@ -341,12 +355,12 @@ private:
 		if (w == 1)
 		{
 			for (int k = 1; k < h; k++)
-				top(i, j+k) = false;
+				top(i, j+k) = s_passage;
 		}
 		else if (h == 1)
 		{
 			for (int k = 1; k < w; k++)
-				left(i+k, j) = false;
+				left(i+k, j) = s_passage;
 		}
 		else if (w < h)
 		{
@@ -356,7 +370,7 @@ private:
 							   3 + rand()%(h-5);
 			int o = rand()%w;
 			//printf("h_r = %d, o = %d\n", h_r, o);
-			top(i + o, j + h_r) = false;
+			top(i + o, j + h_r) = s_passage;
 			_split(i, j, w, h_r),
 			_split(i, j+h_r, w, h-h_r);
 		}
@@ -368,7 +382,7 @@ private:
 							   3 + rand()%(w-5);
 			int o = rand()%h;
 			//printf("w_r = %d, o = %d\n", w_r, o);
-			left(i + w_r, j + o) = false;
+			left(i + w_r, j + o) = s_passage;
 			_split(i, j, w_r, h),
 			_split(i+w_r, j, w-w_r , h);
 		}
@@ -386,20 +400,20 @@ private:
 		if (i <= 0)
 		{
 			if (j > 0 && j < _h)
-				top(_left_range(i, size, ft), j) = false;
+				top(_left_range(i, size, ft), j) = s_passage;
 		}
 		else if (i >= _w)
 		{
 			if (j > 0 && j < _h)
-				top(_right_range(i, size, ft), j) = false;
+				top(_right_range(i, size, ft), j) = s_passage;
 		}
 		else if (j <= 0)
 		{
-			left(i, _bottom_range(j, size, ft)) = false;
+			left(i, _bottom_range(j, size, ft)) = s_passage;
 		}
 		else if (j >= _h)
 		{
-			left(i, _top_range(j, size, ft)) = false;
+			left(i, _top_range(j, size, ft)) = s_passage;
 		}
 		else
 		{
@@ -412,10 +426,10 @@ private:
 				case frac_reverse_random_orient_no_cross:
 				case frac_all_random:				d = rand() % 4; break;
 			}
-			if (d != 0) top(_left_range(i, size, ft), j) = false;
-			if (d != 1) left(i, _bottom_range(j, size, ft)) = false;
-			if (d != 2) top(_right_range(i, size, ft), j) = false;
-			if (d != 3) left(i, _top_range(j, size, ft)) = false;
+			if (d != 0) top(_left_range(i, size, ft), j) = s_passage;
+			if (d != 1) left(i, _bottom_range(j, size, ft)) = s_passage;
+			if (d != 2) top(_right_range(i, size, ft), j) = s_passage;
+			if (d != 3) left(i, _top_range(j, size, ft)) = s_passage;
 		}
 		
 		if (size == 1)
@@ -461,7 +475,7 @@ private:
 	}
 
 	int _w, _h;
-	bool *_vert, *_horz;
+	state *_vert, *_horz;
 };
 
 int main(int argc, char *argv[])
