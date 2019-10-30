@@ -222,6 +222,36 @@ public:
 						left(best_i, best_j) = s_passage;
 				}
 	}
+	
+	bool stamp(Maze &pattern)
+	{
+		if (pattern._w > _w || pattern._h > _h)
+			return false;
+
+		for (int i = 0; i < pattern._w-1; i++)
+			for (int j = 0; j < pattern._h; j++)
+				if (pattern.right(i, j) == s_wall)
+				{
+					int l = ((i+1) * _w)/pattern._w - 1;
+					int t = (j * _h)/pattern._h;
+					int b = ((j+1) * _h)/pattern._h;
+					printf("r: %d %d -> %d %d-%d\n", i, j, l, t, b);
+					for (int k = t; k < b; k++)
+						right(l, k) = s_wall;
+				}
+		for (int i = 0; i < pattern._w; i++)
+			for (int j = 0; j < pattern._h-1; j++)
+				if (pattern.bottom(i, j) == s_wall)
+				{
+					int l = (i * _w)/pattern._w;
+					int r = ((i+1) * _w)/pattern._w;
+					int b = ((j+1) * _h)/pattern._h - 1;
+					printf("b: %d %d -> %d-%d %d\n", i, j, l, r, b);
+					for (int k = l; k < r; k++)
+						bottom(k, b) = s_wall;
+				}
+		return true;
+	}
 		
 	bool check()
 	{
@@ -316,34 +346,34 @@ private:
 		for (;;)
 		{
 			int c = 0;
-			if (_notVisited(i-1, j, visited)) c++;
-			if (_notVisited(i, j-1, visited)) c++;
-			if (_notVisited(i+1, j, visited)) c++;
-			if (_notVisited(i, j+1, visited)) c++;
+			if (!_hasWall(i, j, 0) && _notVisited(i+1, j, visited)) c++;
+			if (!_hasWall(i, j, 1) && _notVisited(i, j+1, visited)) c++;
+			if (!_hasWall(i, j, 2) && _notVisited(i-1, j, visited)) c++;
+			if (!_hasWall(i, j, 3) && _notVisited(i, j-1, visited)) c++;
 			if (c == 0)
 				break;
 			int r = rand() % c;
 			//printf("      %d,%d %d, %d\n", i, j, c, r);
-			if (_notVisited(i-1, j, visited) && r-- == 0)
+			if (!_hasWall(i, j, 0) && _notVisited(i+1, j, visited) && r-- == 0)
+			{
+				right(i, j) = s_passage;
+				_recurse(i+1, j, visited);
+			}
+			else if (!_hasWall(i, j, 1) && _notVisited(i, j+1, visited) && r-- == 0)
+			{
+				bottom(i, j) = s_passage;
+				_recurse(i, j+1, visited);
+			}
+			else if (!_hasWall(i, j, 2) && _notVisited(i-1, j, visited) && r-- == 0)
 			{
 				left(i, j) = s_passage;
 				_recurse(i-1, j, visited);
 				
 			}
-			else if (_notVisited(i, j-1, visited) && r-- == 0)
+			else if (!_hasWall(i, j, 3) && _notVisited(i, j-1, visited) && r-- == 0)
 			{
 				top(i, j) = s_passage;
 				_recurse(i, j-1, visited);
-			}
-			else if (_notVisited(i+1, j, visited) && r-- == 0)
-			{
-				right(i, j) = s_passage;
-				_recurse(i+1, j, visited);
-			}
-			else if (_notVisited(i, j+1, visited) && r-- == 0)
-			{
-				bottom(i, j) = s_passage;
-				_recurse(i, j+1, visited);
 			}
 		}
 	}
@@ -480,16 +510,20 @@ private:
 
 int main(int argc, char *argv[])
 {
-	//srand(time(0));
-	Maze maze(40, 40);
+	srand(time(0));
+	Maze maze(30, 30);
 	//maze.generateRecursive();
 	//maze.removeCrosses();
 	//maze.generateSplit();
 	//maze.generateFractal(Maze::frac_regular);
-	maze.generateFractal(Maze::frac_reverse_random_orient_no_cross);
+	//maze.generateFractal(Maze::frac_reverse_random_orient_no_cross);
 	//maze.generateFractal(Maze::frac_random_orient_no_cross);
 	//maze.generateFractal(Maze::frac_random_orient);
 	//maze.generateFractal(Maze::frac_all_random);
+	Maze maze2(6, 6);
+	maze2.generateRecursive();
+	maze.stamp(maze2);
+	maze.generateRecursive();
 	maze.print();
 	maze.printStats();
 	if (!maze.check())
