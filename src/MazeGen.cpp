@@ -45,6 +45,18 @@ public:
 	{
 		generateFractal(_w/2, _h/2, type);
 	}
+	void generateTrees()
+	{
+		fix();
+	}
+	void generateRandom()
+	{
+		for (int i = 0; i < (_w-1)*_h; i++)
+			_vert[i] = rand() % 2 == 0 ? s_wall : s_passage;
+		for (int i = 0; i < _w*(_h-1); i++)
+			_horz[i] = rand() % 2 == 0 ? s_wall : s_passage;
+		fix();
+	}
 	void generateFractal(int i, int j, frac_type type)
 	{
 		int size = 1;
@@ -137,6 +149,7 @@ public:
 				case 1: goto L1;
 				case 2: goto L2;
 				case 3: goto L3;
+				case 4: goto L4;
 			}
 			
 			L0:
@@ -149,24 +162,29 @@ public:
 					_d = (_d+3)%4;
 					goto Lmove;
 				}
-				else if (!_maze._hasWall(_i, _j, _d))
-				{
-					Lmove:
-					switch (_d)
-					{
-						case 0: _i++; break;
-						case 1: _j++; break;
-						case 2: _i--; break;
-						case 3: _j--; break;
-					}
-					_turn = 0;
-					_state = 2; return; L2:;
-				}
 				else
 				{
-					_turn = 1;
-					_state = 3; return; L3:;
-					_d = (_d+1)%4;
+					_turn = 2;
+					_state = 2; return; L2:;
+					if (!_maze._hasWall(_i, _j, _d))
+					{
+						Lmove:
+						switch (_d)
+						{
+							case 0: _i++; break;
+							case 1: _j++; break;
+							case 2: _i--; break;
+							case 3: _j--; break;
+						}
+						_turn = 0;
+						_state = 3; return; L3:;
+					}
+					else
+					{
+						_turn = 1;
+						_state = 4; return; L4:;
+						_d = (_d+1)%4;
+					}
 				}
 			}
 			while (_i != _s_i || _j != _s_j || _d != _s_d);
@@ -186,9 +204,9 @@ public:
 			for (int i = 0, j = k; i < _w; i++, j--)
 				if (0 <= j && j < _h && _nrWalls(i, j) == 0)
 				{
-					printf("Cross at %d, %d\n", i, j);
+					//printf("Cross at %d, %d\n", i, j);
 					top(i, j) = s_wall;
-					printf("%d %d %d %d\n", right(i,j), bottom(i,j), left(i,j), top(i,j));
+					//printf("%d %d %d %d\n", right(i,j), bottom(i,j), left(i,j), top(i,j));
 					int min_k = k;
 					int best_i = i, best_j = j;
 					for (iterator it(*this, i, j, 0); it.more(); it.next())
@@ -201,7 +219,7 @@ public:
 							if (min_k == 0)
 								break;
 						}
-					printf(" Found min %d,%d %d\n", best_i, best_j, min_k);
+					//printf(" Found min %d,%d %d\n", best_i, best_j, min_k);
 					if (min_k == 0)
 					{
 						min_k = k-1;
@@ -214,7 +232,7 @@ public:
 								best_i = it.i();
 								best_j = it.j();
 							}
-						printf(" Found min %d,%d\n", best_i, best_j);
+						//printf(" Found min %d,%d\n", best_i, best_j);
 					}
 					if (best_j > 0)
 						top(best_i, best_j) = s_passage;
@@ -235,7 +253,6 @@ public:
 					int l = ((i+1) * _w)/pattern._w - 1;
 					int t = (j * _h)/pattern._h;
 					int b = ((j+1) * _h)/pattern._h;
-					printf("r: %d %d -> %d %d-%d\n", i, j, l, t, b);
 					for (int k = t; k < b; k++)
 						right(l, k) = s_wall;
 				}
@@ -246,7 +263,6 @@ public:
 					int l = (i * _w)/pattern._w;
 					int r = ((i+1) * _w)/pattern._w;
 					int b = ((j+1) * _h)/pattern._h - 1;
-					printf("b: %d %d -> %d-%d %d\n", i, j, l, r, b);
 					for (int k = l; k < r; k++)
 						bottom(k, b) = s_wall;
 				}
@@ -263,6 +279,73 @@ public:
 		return count == 2*(_w*_h - 1);
 	}
 	
+	void fix()
+	{
+		char *c_vert = new char[(_w-1)*_h];
+		char *c_horz = new char[_w*(_h-1)];
+		
+		for (;;)
+		{
+			for (int i = 0; i < (_w-1)*_h; i++)
+				c_vert[i] = 0;
+			for (int i = 0; i < _w*(_h-1); i++)
+				c_horz[i] = 0;
+				
+			int count = 0;
+			for (iterator it(*this, 0, 0, 0); it.more(); it.next())
+				if (it.turn() == 0)
+				{
+					switch (it.d())
+					{
+						case 0: c_vert[_h*(it.i()-1) + it.j()]++; break;
+						case 1: c_horz[it.i() + _w*(it.j()-1)]++; break;
+						case 2: c_vert[_h*it.i() + it.j()]++; break;
+						case 3: c_horz[it.i() + _w*it.j()]++; break;
+					}
+					count++;
+				}
+				else if (it.turn() == 2)
+				{
+					switch (it.d())
+					{
+						case 0: if (it.j() > 0) c_horz[it.i() + _w*(it.j()-1)]++; break;
+						case 1: if (it.i() < _w-1) c_vert[_h*it.i() + it.j()]++; break;
+						case 2: if (it.j() < _h-1) c_horz[it.i() + _w*it.j()]++; break;
+						case 3: if (it.i() > 0) c_vert[_h*(it.i()-1) + it.j()]++; break;
+					}
+				}
+			if (count == 2*(_w*_h - 1))
+				break;
+			
+			count = 0;
+			for (int i = 0; i < (_w-1)*_h; i++)
+				if (c_vert[i] == 1)
+					count++;
+			for (int i = 0; i < _w*(_h-1); i++)
+				if (c_horz[i] == 1)
+					count++;
+			//printf(" %d", count);
+			int r = rand() % count;
+			count = 0;
+			for (int i = 0; i < (_w-1)*_h; i++)
+				if (c_vert[i] == 1)
+				{
+					if (count == r)
+						_vert[i] = (_vert[i] == s_wall) ? s_passage : s_wall;
+					count++;
+				}
+			for (int i = 0; i < _w*(_h-1); i++)
+				if (c_horz[i] == 1)
+				{
+					if (count == r)
+						_horz[i] = (_horz[i] == s_wall) ? s_passage : s_wall;
+					count++;
+				}
+		}
+		
+		delete[] c_vert;
+		delete[] c_horz;
+	}
 	void svg(const char *filename, double wall_width, double hall_width, const char *color, double stroke_width)
 	{
 		FILE *f = fopen(filename, "wt");
@@ -421,7 +504,7 @@ private:
 
 	void _fractal(int i, int j, int size, frac_type ft, int avoid_corner)
 	{
-		printf("frac %d %d %d\n", i, j, size);
+		//printf("frac %d %d %d\n", i, j, size);
 		if (   i + size <= 0 || i - size >= _w
 		    || j + size <= 0 || j - size >= _h)
 		    return;
@@ -520,10 +603,12 @@ int main(int argc, char *argv[])
 	//maze.generateFractal(Maze::frac_random_orient_no_cross);
 	//maze.generateFractal(Maze::frac_random_orient);
 	//maze.generateFractal(Maze::frac_all_random);
-	Maze maze2(6, 6);
-	maze2.generateRecursive();
-	maze.stamp(maze2);
-	maze.generateRecursive();
+	//Maze maze2(6, 6);
+	//maze2.generateRecursive();
+	//maze.stamp(maze2);
+	//maze.fix();
+	//maze.generateRecursive();
+	maze.generateTrees();
 	maze.print();
 	maze.printStats();
 	if (!maze.check())
