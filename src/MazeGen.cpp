@@ -292,7 +292,26 @@ public:
 				c_horz[i] = 0;
 				
 			int count = 0;
-			for (iterator it(*this, 0, 0, 0); it.more(); it.next())
+			int i = rand()%_w;
+			int j = rand()%_h;
+			int d = rand()%4;
+			for (;;)
+			{
+				if (_nrWalls(i, j) > 0)
+				{
+					while (!_hasWall(i, j, d))
+						d = (d+1)%4;
+					d = (d+1)%4;
+					break;
+				}
+				if (++i == _w)
+				{
+					i = 0;
+					if (++j == _h)
+						j = 0;
+				}
+			}
+			for (iterator it(*this, i, j, d); it.more(); it.next())
 				if (it.turn() == 0)
 				{
 					switch (it.d())
@@ -608,7 +627,8 @@ int main(int argc, char *argv[])
 	//maze.stamp(maze2);
 	//maze.fix();
 	//maze.generateRecursive();
-	maze.generateTrees();
+	//maze.generateTrees();
+	maze.generateRandom();
 	maze.print();
 	maze.printStats();
 	if (!maze.check())
