@@ -119,6 +119,22 @@ public:
 		if (types[1 + 2 + 4 + 8])
 			printf("degree 4: %d\n", types[1 + 2 + 4 + 8]);
 	}
+	void printAverageDist()
+	{
+		long int *dist = new long int[_w*_h];
+		for (int i = 0; i < _w*_h; i++)
+			dist[i] = 0;
+		_calcDistances(dist);
+		double sum = 0;
+		double l = 1.0;
+		for (int i = 1; i < _w*_h && dist[i] > 0; i++, l += 1.0)
+		{
+			printf("%d ", dist[i]);
+			sum += dist[i] * l;
+		}
+		printf(" %lf\n", sum / (_w*_h*(_w*_h-1)/2));
+		delete[] dist;
+	}
 	void dump()
 	{
 		for (int j = 0; j < _h; j++)
@@ -397,15 +413,6 @@ public:
 		fprintf(f, "\" stroke=\"%s\" stroke-width=\"%.2lf\" fill-opacity=\"0.0\"/></svg>\n", color, stroke_width);
 		fclose(f);
 	}
-public:		
-	/*
-		fprintf(f, "<svg width=\"%.0f\" height=\"%.0f\" xmlns=\"http://www.w3.org/2000/svg\">\n",
-				total_width, total_height);
-
-			fprintf(f, "<path d=\"M%.2lf %.2lf\n", x, y);
-			fprintf(f, "L %.2lf %.2lf\n", x, y);
-		fprintf(f, "Z\" stroke=\"%s\" stroke-width=\"%.2lf\" fill-opacity=\"0.0\"/>\n", color, stroke_width);
-	*/
 private:
 	int _depth;
 	bool _hasWall(int i, int j, int d)
@@ -605,7 +612,46 @@ private:
 		if (ft != frac_all_random) return max;
 		return min + (min < max ? rand()%(max+1 - min) : 0);
 	}
-
+	class _Cell
+	{
+	public:
+		_Cell() : d(0), nr(1), prev(0) {}
+		int d;
+		long nr;
+		class _Cell *prev;
+	};
+	void _calcDistances(long *dist)
+	{
+		_Cell *cells = new _Cell[_w*_h];
+		for (int i = 0; i < _w; i++)
+			for (int j = 0; j < _h; j++)
+				cells[i + _w*j].d = 4 - _nrWalls(i, j);
+		_Cell *prev = 0;
+		for (iterator it(*this, 0, 0, 0); it.more(); it.next())
+			if (it.turn() == 0)
+			{
+				_Cell *cell = &cells[it.i() + _w*it.j()];
+				if (cell->d != 0)
+				{
+					int a_l = 1;
+					for (_Cell* a = prev; a != 0; a = a->prev, a_l++)
+					{
+						dist[a_l] += a->nr;
+						int b_l = 1;
+						for (_Cell* b = cell->prev; b != 0; b = b->prev, b_l++)
+							dist[a_l + b_l] += a->nr * b->nr;
+					}
+					_Cell* a = prev;
+					_Cell* b = cell->prev;
+					for (; a != 0 && b != 0; a = a->prev, b = b->prev)
+						a->nr = b->nr = a->nr + b->nr;
+					if (a != 0)
+						cell->prev = prev;
+					prev = (--cell->d == 0) ? cell : 0;
+				}
+			}
+		delete[] cells;
+	}
 	int _w, _h;
 	state *_vert, *_horz;
 };
@@ -631,6 +677,7 @@ int main(int argc, char *argv[])
 	maze.generateRandom();
 	maze.print();
 	maze.printStats();
+	maze.printAverageDist();
 	if (!maze.check())
 		printf("Incorrect\n");
 	maze.svg("Maze.svg", 2, 8, "red", 1);
