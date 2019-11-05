@@ -1,6 +1,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
+
+class Stat
+{
+public:
+	Stat() : _sum(0.0), _sqrsum(0.0), _n(0) {}
+	void add(double v)
+	{
+		_sum += v;
+		_sqrsum += v*v;
+		_n++;
+	}
+	double avg() { return _sum / _n; }
+	double stddev() { return sqrt((_sqrsum - (_sum * _sum)/_n)/(_n - 1)); } 
+private:
+	double _sum;
+	double _sqrsum;
+	int _n;
+};
 
 class Maze
 {
@@ -84,14 +103,9 @@ public:
 	void printStats()
 	{
 		int types[16];
-		for (int i = 0; i < 16; i++)
-			types[i] = 0;
-		for (int i = 0; i < _w; i++)
-			for (int j = 0; j < _h; j++)
-				types[  (_hasWall(i, j, 0) ? 0 : 1)
-				      | (_hasWall(i, j, 1) ? 0 : 2)
-				      | (_hasWall(i, j, 2) ? 0 : 4)
-				      | (_hasWall(i, j, 3) ? 0 : 8)]++;
+		int one, two_straight, two_turn, three, four;
+		_calcStats(types, &one, &two_straight, &two_turn, &three, &four);
+		
 		for (int i = 0; i < 16; i++)
 			if (types[i] > 0)
 			{
@@ -102,9 +116,7 @@ public:
 				printf(":%d", types[i]);
 			}
 		printf("\n");
-		printf("degree 1: %d\n", types[1] + types[2] + types[4] + types[8]);
-		int two_straight = types[1+4] + types[2 + 8];
-		int two_turn = types[1 + 2] + types[2 + 4] + types[4 + 8] + types[8 + 1];
+		printf("degree 1: %d\n", one);
 		if (two_straight + two_turn > 0)
 		{
 			printf("degree 2: %d", two_straight + two_turn);
@@ -114,10 +126,9 @@ public:
 				printf(" turn:%d", two_turn);
 			printf("\n");
 		}
-		int three = types[1 + 2 + 4] + types[2 + 4 + 8] + types [4 + 8 + 1] + types[8 + 1 + 2];
 		printf("degree 3: %d\n", three);
-		if (types[1 + 2 + 4 + 8])
-			printf("degree 4: %d\n", types[1 + 2 + 4 + 8]);
+		if (four > 0)
+			printf("degree 4: %d\n", four);
 	}
 	void printAverageDist()
 	{
@@ -134,6 +145,32 @@ public:
 		}
 		printf(" %lf\n", sum / (_w*_h*(_w*_h-1)/2));
 		delete[] dist;
+	}
+	void calcStats(Stat (&stats)[22])
+	{
+		int types[16];
+		int one, two_straight, two_turn, three, four;
+		_calcStats(types, &one, &two_straight, &two_turn, &three, &four);
+		for (int i = 0; i < 16; i++)
+		{
+			stats[i].add(types[i]);
+			//printf("%d ", types[i]);
+		}
+		stats[16].add(one);
+		stats[17].add(two_straight);
+		stats[18].add(two_turn);
+		stats[19].add(three);
+		stats[20].add(four);
+		long int *dist = new long int[_w*_h];
+		for (int i = 0; i < _w*_h; i++)
+			dist[i] = 0;
+		_calcDistances(dist);
+		double sum = 0;
+		double l = 1.0;
+		for (int i = 1; i < _w*_h && dist[i] > 0; i++, l += 1.0)
+			sum += dist[i] * l;
+		stats[21].add(sum / (_w*_h*(_w*_h-1)/2));
+		printf("%lf\n", sum / (_w*_h*(_w*_h-1)/2));
 	}
 	void dump()
 	{
@@ -620,6 +657,22 @@ private:
 		long nr;
 		class _Cell *prev;
 	};
+	void _calcStats(int* types, int* one, int* two_straight, int* two_turn, int* three, int* four)
+	{
+		for (int i = 0; i < 16; i++)
+			types[i] = 0;
+		for (int i = 0; i < _w; i++)
+			for (int j = 0; j < _h; j++)
+				types[  (_hasWall(i, j, 0) ? 0 : 1)
+				      | (_hasWall(i, j, 1) ? 0 : 2)
+				      | (_hasWall(i, j, 2) ? 0 : 4)
+				      | (_hasWall(i, j, 3) ? 0 : 8)]++;
+		*one = types[1] + types[2] + types[4] + types[8];
+		*two_straight = types[1+4] + types[2 + 8];
+		*two_turn = types[1 + 2] + types[2 + 4] + types[4 + 8] + types[8 + 1];
+		*three = types[1 + 2 + 4] + types[2 + 4 + 8] + types [4 + 8 + 1] + types[8 + 1 + 2];
+		*four = types[1 + 2 + 4 + 8];
+	}
 	void _calcDistances(long *dist)
 	{
 		_Cell *cells = new _Cell[_w*_h];
@@ -659,7 +712,7 @@ private:
 int main(int argc, char *argv[])
 {
 	srand(time(0));
-	Maze maze(30, 30);
+	//Maze maze(30, 30);
 	//maze.generateRecursive();
 	//maze.removeCrosses();
 	//maze.generateSplit();
@@ -674,12 +727,31 @@ int main(int argc, char *argv[])
 	//maze.fix();
 	//maze.generateRecursive();
 	//maze.generateTrees();
-	maze.generateRandom();
-	maze.print();
-	maze.printStats();
-	maze.printAverageDist();
-	if (!maze.check())
-		printf("Incorrect\n");
-	maze.svg("Maze.svg", 2, 8, "red", 1);
+	//maze.generateRandom();
+	//maze.print();
+	//maze.printStats();
+	//maze.printAverageDist();
+	//if (!maze.check())
+	//	printf("Incorrect\n");
+	//maze.svg("Maze.svg", 2, 8, "red", 1);
 	//maze.dump();
+	
+	Stat stats[22];
+	for (int i = 0; i < 100; i++)
+	{
+		Maze maze(30, 30);
+		//maze.generateRandom();
+		//maze.generateRecursive();
+		//maze.generateTrees();
+		Maze maze2(6, 6);
+		maze2.generateRecursive();
+		maze.stamp(maze2);
+		maze.fix();
+		maze.calcStats(stats);
+	}
+	for (int i = 0; i < 22; i++)
+	{
+		printf(" %.0lf(%.0lf)", stats[i].avg(), stats[i].stddev());
+	}
+	printf("\n");
 }
