@@ -14,12 +14,28 @@ public:
 		_n++;
 	}
 	double avg() { return _sum / _n; }
-	double stddev() { return sqrt((_sqrsum - (_sum * _sum)/_n)/(_n - 1)); } 
+	double stddev() { return sqrt((_sqrsum - (_sum * _sum)/_n)/(_n - 1)); }
+	static double dist(Stat &p, Stat &q)
+	{
+		// https://en.wikipedia.org/wiki/Bhattacharyya_distance
+		double avg_p = p.avg();
+		double std2_p = p.stddev();
+		std2_p = std2_p * std2_p;
+		double avg_q = q.avg();
+		double std2_q = q.stddev();
+		std2_q = std2_q * std2_q;
+		
+		return ( log((std2_p/std2_q + std2_q/std2_p + 2)/4)
+		       + (avg_p - avg_q)*(avg_p - avg_q)/(std2_p + std2_q)
+		       )/4;
+	}
 private:
 	double _sum;
 	double _sqrsum;
 	int _n;
 };
+
+
 
 class Maze
 {
@@ -140,7 +156,7 @@ public:
 		double l = 1.0;
 		for (int i = 1; i < _w*_h && dist[i] > 0; i++, l += 1.0)
 		{
-			printf("%d ", dist[i]);
+			printf("%ld ", dist[i]);
 			sum += dist[i] * l;
 		}
 		printf(" %lf\n", sum / (_w*_h*(_w*_h-1)/2));
@@ -151,16 +167,17 @@ public:
 		int types[16];
 		int one, two_straight, two_turn, three, four;
 		_calcStats(types, &one, &two_straight, &two_turn, &three, &four);
+		double tot = _w * _h;
 		for (int i = 0; i < 16; i++)
 		{
-			stats[i].add(types[i]);
+			stats[i].add(types[i]/tot);
 			//printf("%d ", types[i]);
 		}
-		stats[16].add(one);
-		stats[17].add(two_straight);
-		stats[18].add(two_turn);
-		stats[19].add(three);
-		stats[20].add(four);
+		stats[16].add(one/tot);
+		stats[17].add(two_straight/tot);
+		stats[18].add(two_turn/tot);
+		stats[19].add(three/tot);
+		stats[20].add(four/tot);
 		long int *dist = new long int[_w*_h];
 		for (int i = 0; i < _w*_h; i++)
 			dist[i] = 0;
@@ -170,7 +187,24 @@ public:
 		for (int i = 1; i < _w*_h && dist[i] > 0; i++, l += 1.0)
 			sum += dist[i] * l;
 		stats[21].add(sum / (_w*_h*(_w*_h-1)/2));
-		printf("%lf\n", sum / (_w*_h*(_w*_h-1)/2));
+		//printf("%lf\n", sum / (_w*_h*(_w*_h-1)/2));
+	}
+	long calcDist()
+	{
+		int types[16];
+		int one, two_straight, two_turn, three, four;
+		_calcStats(types, &one, &two_straight, &two_turn, &three, &four);
+		long result = 0;
+		int exp = _w * _h / 15;
+		for (int i = 1; i < 15; i++)
+		{
+			int d = (exp - types[i]);
+			if (d < 0)
+				d = -d;
+			printf("%4d", d);
+			result += d*d*d;
+		}
+		return result;
 	}
 	void dump()
 	{
@@ -538,7 +572,7 @@ private:
 			for (int k = 1; k < w; k++)
 				left(i+k, j) = s_passage;
 		}
-		else if (w < h)
+		else if (w < h || (w == h && (rand()%2 == 0)))
 		{
 			int h_r = h == 2 ? 1 :
 					  h <= 4 ? 1 + rand()%(h-1) :
@@ -709,6 +743,24 @@ private:
 	state *_vert, *_horz;
 };
 
+void dist_kind(Stat* stats, int* vec, int n, const char *name)
+{
+	//for (int i = 0; i < n; i++)
+	//	printf(" %5.2lf(%5.2lf)", 100*stats[vec[i]].avg(), 100*stats[vec[i]].stddev());
+	double max_dist = 0;
+	double sum_dist = 0;
+	for (int i = 0; i < n-1; i++)
+		for (int j = i+1; j < n; j++)
+		{
+			double dist = Stat::dist(stats[vec[i]], stats[vec[j]]);
+			if (dist > max_dist)
+				max_dist = dist;
+			sum_dist += dist;
+		}
+	//printf(" %s = %6.3lf %6.3lf", name, max_dist, sum_dist);
+	printf(" %6.3lf", sum_dist);
+}
+
 int main(int argc, char *argv[])
 {
 	srand(time(0));
@@ -736,22 +788,104 @@ int main(int argc, char *argv[])
 	//maze.svg("Maze.svg", 2, 8, "red", 1);
 	//maze.dump();
 	
-	Stat stats[22];
-	for (int i = 0; i < 100; i++)
+	
+	for (int t = 0; t < 9; t++)
 	{
+		printf("%d ", t);
+		for (int size = 20; size <= 20; size += 10)
+		{
+			Stat stats[22];
+			Stat times;
+			for (int i = 0; i < 500; i++)
+			{
+				Maze maze(size, size);
+				long start = clock();
+				switch(t)
+				{
+					case 0:
+						maze.generateRandom(); break;
+					case 1:
+						maze.generateSplit(); break;
+					case 2:
+						maze.generateRecursive(); break;
+					case 3:
+						maze.generateTrees(); break;
+					case 4:
+					{
+						Maze maze2(size/5, size/5);
+						maze2.generateRecursive();
+						maze.stamp(maze2);
+						maze.fix();
+					} break;
+					case 5:
+						maze.generateFractal(Maze::frac_reverse_random_orient_no_cross); break;
+					case 6:
+						maze.generateFractal(Maze::frac_random_orient_no_cross); break;
+					case 7:
+						maze.generateFractal(Maze::frac_random_orient); break;
+					case 8:
+						maze.generateFractal(Maze::frac_all_random); break;
+				}
+				times.add((clock() - start)/((double)size * size));
+				maze.calcStats(stats);
+			}
+			//printf("%d: ", size);
+			/*for (int i = 1; i < 21; i++)
+			{
+				printf(" %5.2lf(%5.2lf)", 100*stats[i].avg(), 100*stats[i].stddev());
+			}*/
+			int ones[4] = { 1, 2, 4, 8 };
+			dist_kind(stats, ones, 4, "ones");
+			int two_corners[4] = { 1+2, 2+4, 4+8, 8+1 };
+			dist_kind(stats, two_corners, 4, "two corners");
+			int two_straight[2] = { 1+4, 2+8 };
+			dist_kind(stats, two_straight, 2, "two straight");
+			int three[4] = { 1+2+4, 2+4+8, 4+8+1, 8+1+2 };
+			dist_kind(stats, three, 4, "three");
+			printf(" %.2lf(%.2lf)", stats[21].avg(), stats[21].stddev());
+			printf(" %.2lf(%.2lf)", times.avg(), times.stddev());
+			printf("\n");
+			/*
+			for (int i = 0; i < 4; i++)
+				printf(" %5.2lf(%5.2lf)\n", 100*stats[ones[i]].avg(), 100*stats[ones[i]].stddev());
+			double max_dist = 0;
+			double sum_dist = 0;
+			for (int i = 0; i < 3; i++)
+				for (int j = i+1; j < 4; j++)
+				{
+					double dist = Stat::dist(stats[ones[i]], stats[ones[j]]);
+					if (dist > max_dist)
+						max_dist = dist;
+					sum_dist += dist;
+				}
+			printf("ones dist = %lf %lf\n", max_dist, sum_dist);
+			*/
+		}
+	}
+/*
+	long min_dist;
+	int min_i = 0;
+	for (int i = 1; ; i++)
+	{
+		srand(i);
 		Maze maze(30, 30);
-		//maze.generateRandom();
-		//maze.generateRecursive();
-		//maze.generateTrees();
-		Maze maze2(6, 6);
-		maze2.generateRecursive();
-		maze.stamp(maze2);
-		maze.fix();
-		maze.calcStats(stats);
+		maze.generateRandom();
+		long dist = maze.calcDist();
+		printf(" %ld\n", dist);
+		if (min_i == 0 || dist < min_dist)
+		{
+			min_dist = dist;
+			min_i = i;
+		}
+		if (i % 1000 == 0)
+		{
+			srand(min_i);
+			Maze maze(30, 30);
+			maze.generateRandom();
+			printf("\nDist = %ld\n", maze.calcDist());
+			maze.svg("Maze.svg", 2, 8, "red", 1);
+			maze.svg("Maze2.svg", 5, 5, "red", 1);
+		}
 	}
-	for (int i = 0; i < 22; i++)
-	{
-		printf(" %.0lf(%.0lf)", stats[i].avg(), stats[i].stddev());
-	}
-	printf("\n");
+	*/
 }
