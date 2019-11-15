@@ -111,13 +111,16 @@ public:
 			while (state[i + _w*j] != 4)
 			{
 				int d = rand()%4;
-				state[i + _w*j] = d;
-				switch(d)
+				if (!_hasWall(i, j, d))
 				{
-					case 0: if (i+1 < _w) i++; break;
-					case 1: if (j+1 < _h) j++; break;
-					case 2: if (i-1 >= 0) i--; break;
-					case 3: if (j-1 >= 0) j--; break;
+					state[i + _w*j] = d;
+					switch(d)
+					{
+						case 0: i++; break;
+						case 1: j++; break;
+						case 2: i--; break;
+						case 3: j--; break;
+					}
 				}
 			}
 			//printf("found\n");
@@ -932,7 +935,10 @@ int main(int argc, char *argv[])
 	for (int i = 1; ; i++)
 	{
 		srand(i);
+		Maze maze2(6, 6);
+		maze2.generateRecursive();
 		Maze maze(30, 30);
+		maze.stamp(maze2);
 		maze.generateWilson();
 		long dist = maze.calcDist();
 		printf(" %ld\n", dist);
@@ -944,8 +950,11 @@ int main(int argc, char *argv[])
 		if (i % 1000 == 0)
 		{
 			srand(min_i);
+			Maze maze2(6, 6);
+			maze2.generateRecursive();
 			Maze maze(30, 30);
-			maze.generateRandom();
+			maze.stamp(maze2);
+			maze.generateWilson();
 			printf("\nDist = %ld\n", maze.calcDist());
 			maze.svg("Maze.svg", 2, 8, "red", 1);
 			maze.svg("Maze2.svg", 5, 5, "red", 1);
