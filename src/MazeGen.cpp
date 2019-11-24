@@ -352,55 +352,62 @@ public:
 	{
 		for (int k = _w + _h - 2; k > 0; k--)
 			for (int i = 0, j = k; i < _w; i++, j--)
-				if (0 <= j && j < _h && _nrWalls(i, j) == 0)
+				if (0 <= j && j < _h)
 				{
-					//printf("Cross at %d, %d\n", i, j);
-					top(i, j) = s_wall;
-					//printf("%d %d %d %d\n", right(i,j), bottom(i,j), left(i,j), top(i,j));
-					int min_k = k;
-					int best_i = i, best_j = j;
-					bool include_home = false;
-					for (iterator it(*this, i, j, 0); it.more(); it.next())
-						if (it.turn() == 0)
+					int side = rand()%2 == 0;
+					for (int p = 0; p < 2 && _nrWalls(i, j) == 0; p++, side = 1-side)
+					{
+						//printf("Cross at %d, %d %d\n", i, j, p);
+						int start_s;
+						if (side == 0)
 						{
-							if (it.i() == 0 && it.j() == 0)
-								include_home = true;
-							if (it.i() + it.j() < min_k && (_wall(it.i(), it.j(), 2) == s_wall || _wall(it.i(), it.j(), 3) == s_wall))
-							{
-								//printf("  %2d %2d %d\n", it.i(), it.j(), it.d());
-								min_k = it.i() + it.j();
-								best_i = it.i();
-								best_j = it.j();
-								if (min_k == 0)
-									break;
-							}
+							top(i, j) = s_wall;
+							start_s = p < 2 ? 0 : 2;
 						}
-					//printf(" Found min %d,%d %d\n", best_i, best_j, min_k);
-					if (include_home)
-					{
-						min_k = k-1;
-						best_i = i;
-						best_j = j-1;
-						for (iterator it(*this, i, j-1, 2); it.more(); it.next())
-							if (it.turn() == 0 && it.i() + it.j() < min_k && (_wall(it.i(), it.j(), 2) == s_wall || _wall(it.i(), it.j(), 3) == s_wall))
+						else
+						{
+							left(i, j) = s_wall;
+							start_s = p < 2 ? 3 : 1;
+						}
+						
+						//printf("%d %d %d %d\n", right(i,j), bottom(i,j), left(i,j), top(i,j));
+						int max_nr_walls = 1;
+						int min_k = k;
+						int best_i = i;
+						int best_j = j;
+						for (iterator it(*this, i - (p < 2 ? 0 : side), j - (p < 2 ? 0 : 1-side), start_s); it.more(); it.next())
+							if (it.turn() == 2)
 							{
-								min_k = it.i() + it.j();
-								best_i = it.i();
-								best_j = it.j();
+								if (it.i() == 0 && it.j() == 0)
+								{
+									// Reached top left corner: restore wall
+									best_i = i;
+									best_j = j;
+									break;
+								}
+								int this_k = it.i() + it.j();
+								int nr_walls = _nrWalls(i, j);
+								if (this_k < min_k || (this_k == min_k && nr_walls > max_nr_walls))
+								{
+									//printf("  %2d %2d %d %d\n", it.i(), it.j(), it.d(), nr_walls);
+									min_k = this_k;
+									max_nr_walls = nr_walls;
+									best_i = it.i();
+									best_j = it.j();
+								}
 							}
-						//printf(" Found min %d,%d\n", best_i, best_j);
-					}
-					bool l = _wall(best_i, best_j, 2) == s_wall;
-					bool t = _wall(best_i, best_j, 3) == s_wall;
-					if (l || t)
-					{
-						if (l && t ? rand() % 2 == 0 : t)
+						bool l = _wall(best_i, best_j, 2) == s_wall;
+						bool t = _wall(best_i, best_j, 3) == s_wall;
+						if (!l && !t)
+						{
+							top(i, j) = s_passage;
+							left(i, j) = s_passage;
+						}
+						else if (l && t ? rand() % 2 == 0 : t)
 							top(best_i, best_j) = s_passage;
 						else
 							left(best_i, best_j) = s_passage;
 					}
-					else
-						top(i, j) = s_passage;
 				}
 	}
 	
@@ -899,6 +906,8 @@ bool test_all()
 		maze.stamp(maze2);
 		maze.generateRecursive();
 		if (!maze.check()) { fprintf(stderr, "Error: generateRecursive with stamp failed\n"); result = false; }
+		maze.removeCrosses();
+		if (!maze.check()) { fprintf(stderr, "Error: generateRecursive with stamp failed after removing crosses\n"); result = false; }
 	}
 	{
 		Maze maze2(6, 6);
@@ -907,6 +916,8 @@ bool test_all()
 		maze.stamp(maze2);
 		maze.generateRandom();
 		if (!maze.check()) { fprintf(stderr, "Error: generateRandom with stamp failed\n"); result = false; }
+		maze.removeCrosses();
+		if (!maze.check()) { fprintf(stderr, "Error: generateRandom with stamp failed after removing crosses\n"); return false; }
 	}
 	{
 		Maze maze2(6, 6);
@@ -915,6 +926,8 @@ bool test_all()
 		maze.stamp(maze2);
 		maze.generateWilson();
 		if (!maze.check()) { fprintf(stderr, "Error: generateWilson with stamp failed\n"); result = false; }
+		maze.removeCrosses();
+		if (!maze.check()) { fprintf(stderr, "Error: generateWilson with stamp failed after removing crosses\n"); result = false; }
 	}
 	{
 		Maze maze2(6, 6);
@@ -923,6 +936,8 @@ bool test_all()
 		maze.stamp(maze2);
 		maze.generateTrees();
 		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stamp failed\n"); result = false; }
+		maze.removeCrosses();
+		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stamp failed after removing crosses\n"); result = false; }
 	}
 	return result;
 }
