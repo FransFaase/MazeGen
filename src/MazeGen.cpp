@@ -40,16 +40,16 @@ private:
 class Maze
 {
 private:
-	enum state { s_wall, s_passage, s_undefined };
+	enum state { s_passage, s_wall, s_hard_wall };
 public:
 	Maze(int w, int h) : _w(w), _h(h), _depth(0)
 	{
 		_vert = new state[(w-1)*h];
 		for (int i = 0; i < (w-1)*h; i++)
-			_vert[i] = s_undefined;
+			_vert[i] = s_wall;
 		_horz = new state[w*(h-1)];
 		for (int i = 0; i < w*(h-1); i++)
-			_horz[i] = s_undefined;
+			_horz[i] = s_wall;
 	}
 	~Maze()
 	{
@@ -68,12 +68,10 @@ public:
 			visited[i] = false;
 		_recurse(0, 0, visited);
 		delete[] visited;
-		_undefinedToWall();
 	}
 	void generateSplit()
 	{
 		_split(0, 0, _w, _h);
-		_undefinedToWall();
 	}
 	enum frac_type { frac_regular, frac_reverse, frac_random_orient_no_cross, frac_reverse_random_orient_no_cross, frac_random_orient, frac_all_random };
 	void generateFractal(frac_type type)
@@ -82,6 +80,12 @@ public:
 	}
 	void generateTrees()
 	{
+		for (int i = 0; i < (_w-1)*_h; i++)
+			if (_vert[i] != s_hard_wall)
+				_vert[i] = s_passage;
+		for (int i = 0; i < _w*(_h-1); i++)
+			if (_vert[i] != s_hard_wall)
+				_horz[i] = s_passage;
 		fix();
 	}
 	void generateWilson()
@@ -111,7 +115,7 @@ public:
 			while (state[i + _w*j] != 4)
 			{
 				int d = rand()%4;
-				if (!_hasWall(i, j, d))
+				if (_wall(i, j, d) != s_hard_wall)
 				{
 					state[i + _w*j] = d;
 					switch(d)
@@ -140,20 +144,16 @@ public:
 				to_go--;
 			}
 		}
-		for (int i = 0; i < (_w-1)*_h; i++)
-			if (_vert[i] == s_undefined)
-				_vert[i] = s_wall;
-		for (int i = 0; i < _w*(_h-1); i++)
-			if (_horz[i] == s_undefined)
-				_horz[i] = s_wall;
 		delete state;
 	}
 	void generateRandom()
 	{
 		for (int i = 0; i < (_w-1)*_h; i++)
-			_vert[i] = rand() % 2 == 0 ? s_wall : s_passage;
+			if (_vert[i] != s_hard_wall)
+				_vert[i] = rand() % 2 == 0 ? s_wall : s_passage;
 		for (int i = 0; i < _w*(_h-1); i++)
-			_horz[i] = rand() % 2 == 0 ? s_wall : s_passage;
+			if (_horz[i] != s_hard_wall)
+				_horz[i] = rand() % 2 == 0 ? s_wall : s_passage;
 		fix();
 	}
 	void generateFractal(int i, int j, frac_type type)
@@ -163,7 +163,6 @@ public:
 		       || j - size > 0 || j + size < _w-1)
 			size *= 2;
 		_fractal(i, j, size, type, -1);
-		_undefinedToWall();
 	}
 	void print()
 	{
@@ -360,24 +359,30 @@ public:
 					//printf("%d %d %d %d\n", right(i,j), bottom(i,j), left(i,j), top(i,j));
 					int min_k = k;
 					int best_i = i, best_j = j;
+					bool include_home = false;
 					for (iterator it(*this, i, j, 0); it.more(); it.next())
-						if (it.turn() == 0 && it.i() + it.j() < min_k)
+						if (it.turn() == 0)
 						{
-							//printf("  %2d %2d %d\n", it.i(), it.j(), it.d());
-							min_k = it.i() + it.j();
-							best_i = it.i();
-							best_j = it.j();
-							if (min_k == 0)
-								break;
+							if (it.i() == 0 && it.j() == 0)
+								include_home = true;
+							if (it.i() + it.j() < min_k && (_wall(it.i(), it.j(), 2) == s_wall || _wall(it.i(), it.j(), 3) == s_wall))
+							{
+								//printf("  %2d %2d %d\n", it.i(), it.j(), it.d());
+								min_k = it.i() + it.j();
+								best_i = it.i();
+								best_j = it.j();
+								if (min_k == 0)
+									break;
+							}
 						}
 					//printf(" Found min %d,%d %d\n", best_i, best_j, min_k);
-					if (min_k == 0)
+					if (include_home)
 					{
 						min_k = k-1;
 						best_i = i;
 						best_j = j-1;
 						for (iterator it(*this, i, j-1, 2); it.more(); it.next())
-							if (it.turn() == 0 && it.i() + it.j() < min_k)
+							if (it.turn() == 0 && it.i() + it.j() < min_k && (_wall(it.i(), it.j(), 2) == s_wall || _wall(it.i(), it.j(), 3) == s_wall))
 							{
 								min_k = it.i() + it.j();
 								best_i = it.i();
@@ -385,10 +390,17 @@ public:
 							}
 						//printf(" Found min %d,%d\n", best_i, best_j);
 					}
-					if (best_j > 0)
-						top(best_i, best_j) = s_passage;
+					bool l = _wall(best_i, best_j, 2) == s_wall;
+					bool t = _wall(best_i, best_j, 3) == s_wall;
+					if (l || t)
+					{
+						if (l && t ? rand() % 2 == 0 : t)
+							top(best_i, best_j) = s_passage;
+						else
+							left(best_i, best_j) = s_passage;
+					}
 					else
-						left(best_i, best_j) = s_passage;
+						top(i, j) = s_passage;
 				}
 	}
 	
@@ -399,23 +411,23 @@ public:
 
 		for (int i = 0; i < pattern._w-1; i++)
 			for (int j = 0; j < pattern._h; j++)
-				if (pattern.right(i, j) == s_wall)
+				if (pattern.right(i, j) >= s_wall)
 				{
 					int l = ((i+1) * _w)/pattern._w - 1;
 					int t = (j * _h)/pattern._h;
 					int b = ((j+1) * _h)/pattern._h;
 					for (int k = t; k < b; k++)
-						right(l, k) = s_wall;
+						right(l, k) = s_hard_wall;
 				}
 		for (int i = 0; i < pattern._w; i++)
 			for (int j = 0; j < pattern._h-1; j++)
-				if (pattern.bottom(i, j) == s_wall)
+				if (pattern.bottom(i, j) >= s_wall)
 				{
 					int l = (i * _w)/pattern._w;
 					int r = ((i+1) * _w)/pattern._w;
 					int b = ((j+1) * _h)/pattern._h - 1;
 					for (int k = l; k < r; k++)
-						bottom(k, b) = s_wall;
+						bottom(k, b) = s_hard_wall;
 				}
 		return true;
 	}
@@ -489,28 +501,31 @@ public:
 			
 			count = 0;
 			for (int i = 0; i < (_w-1)*_h; i++)
-				if (c_vert[i] == 1)
+				if (c_vert[i] == 1 && _vert[i] != s_hard_wall)
 					count++;
 			for (int i = 0; i < _w*(_h-1); i++)
-				if (c_horz[i] == 1)
+				if (c_horz[i] == 1 && _horz[i] != s_hard_wall)
 					count++;
 			//printf(" %d", count);
-			int r = rand() % count;
-			count = 0;
-			for (int i = 0; i < (_w-1)*_h; i++)
-				if (c_vert[i] == 1)
-				{
-					if (count == r)
-						_vert[i] = (_vert[i] == s_wall) ? s_passage : s_wall;
-					count++;
-				}
-			for (int i = 0; i < _w*(_h-1); i++)
-				if (c_horz[i] == 1)
-				{
-					if (count == r)
-						_horz[i] = (_horz[i] == s_wall) ? s_passage : s_wall;
-					count++;
-				}
+			if (count > 0)
+			{
+				int r = count == 1 ? 0 : rand() % count;
+				count = 0;
+				for (int i = 0; i < (_w-1)*_h; i++)
+					if (c_vert[i] == 1 && _vert[i] != s_hard_wall)
+					{
+						if (count == r)
+							_vert[i] = (_vert[i] == s_wall) ? s_passage : s_wall;
+						count++;
+					}
+				for (int i = 0; i < _w*(_h-1); i++)
+					if (c_horz[i] == 1 && _horz[i] != s_hard_wall)
+					{
+						if (count == r)
+							_horz[i] = (_horz[i] == s_wall) ? s_passage : s_wall;
+						count++;
+					}
+			}
 		}
 		
 		delete[] c_vert;
@@ -550,16 +565,20 @@ public:
 	}
 private:
 	int _depth;
-	bool _hasWall(int i, int j, int d)
+	state _wall(int i, int j, int d)
 	{
 		switch((d+4)%4)
 		{
-			case 0: return i >= _w-1 || right(i, j) == s_wall;
-			case 1: return j >= _h-1 || bottom(i, j) == s_wall;
-			case 2: return i <= 0    || left(i, j) == s_wall;
-			case 3: return j <= 0    || top(i, j) == s_wall;
+			case 0: return i >= _w-1 ? s_hard_wall : right(i, j);
+			case 1: return j >= _h-1 ? s_hard_wall : bottom(i, j);
+			case 2: return i <= 0    ? s_hard_wall : left(i, j);
+			case 3: return j <= 0    ? s_hard_wall : top(i, j);
 		}
-		return true;
+		return s_hard_wall;
+	}
+	bool _hasWall(int i, int j, int d)
+	{
+		return _wall(i, j, d) != s_passage;
 	}
 	int _nrWalls(int i, int j)
 	{
@@ -573,15 +592,6 @@ private:
 	{
 		return 0 <= i && i < _w && 0 <= j && j < _h && !visited[i + _w*j];
 	}
-	void _undefinedToWall()
-	{
-		for (int i = 0; i < (_w-1)*_h; i++)
-			if (_vert[i] == s_undefined)
-				_vert[i] = s_wall;
-		for (int i = 0; i < _w*(_h-1); i++)
-			if (_horz[i] == s_undefined)
-				_horz[i] = s_wall;
-	}
 	void _recurse(int i, int j, bool *visited)
 	{
 		//print();
@@ -590,31 +600,31 @@ private:
 		for (;;)
 		{
 			int c = 0;
-			if (!_hasWall(i, j, 0) && _notVisited(i+1, j, visited)) c++;
-			if (!_hasWall(i, j, 1) && _notVisited(i, j+1, visited)) c++;
-			if (!_hasWall(i, j, 2) && _notVisited(i-1, j, visited)) c++;
-			if (!_hasWall(i, j, 3) && _notVisited(i, j-1, visited)) c++;
+			if (_wall(i, j, 0) != s_hard_wall && _notVisited(i+1, j, visited)) c++;
+			if (_wall(i, j, 1) != s_hard_wall && _notVisited(i, j+1, visited)) c++;
+			if (_wall(i, j, 2) != s_hard_wall && _notVisited(i-1, j, visited)) c++;
+			if (_wall(i, j, 3) != s_hard_wall && _notVisited(i, j-1, visited)) c++;
 			if (c == 0)
 				break;
 			int r = rand() % c;
 			//printf("      %d,%d %d, %d\n", i, j, c, r);
-			if (!_hasWall(i, j, 0) && _notVisited(i+1, j, visited) && r-- == 0)
+			if (_wall(i, j, 0) != s_hard_wall && _notVisited(i+1, j, visited) && r-- == 0)
 			{
 				right(i, j) = s_passage;
 				_recurse(i+1, j, visited);
 			}
-			else if (!_hasWall(i, j, 1) && _notVisited(i, j+1, visited) && r-- == 0)
+			else if (_wall(i, j, 1) != s_hard_wall && _notVisited(i, j+1, visited) && r-- == 0)
 			{
 				bottom(i, j) = s_passage;
 				_recurse(i, j+1, visited);
 			}
-			else if (!_hasWall(i, j, 2) && _notVisited(i-1, j, visited) && r-- == 0)
+			else if (_wall(i, j, 2) != s_hard_wall && _notVisited(i-1, j, visited) && r-- == 0)
 			{
 				left(i, j) = s_passage;
 				_recurse(i-1, j, visited);
 				
 			}
-			else if (!_hasWall(i, j, 3) && _notVisited(i, j-1, visited) && r-- == 0)
+			else if (_wall(i, j, 3) != s_hard_wall && _notVisited(i, j-1, visited) && r-- == 0)
 			{
 				top(i, j) = s_passage;
 				_recurse(i, j-1, visited);
@@ -825,8 +835,105 @@ void dist_kind(Stat* stats, int* vec, int n, const char *name)
 	printf(" %6.3lf |", sum_dist);
 }
 
+bool test_all()
+{
+	bool result = true;
+	srand(time(0));
+	{
+		Maze maze(30, 30);
+		maze.generateRecursive();
+		if (!maze.check()) { fprintf(stderr, "Error: generateRecursive failed\n"); result = false; }
+		maze.removeCrosses();
+		if (!maze.check()) { fprintf(stderr, "Error: generateRecursive failed after remove crosses\n"); result = false; }
+	}
+	{
+		Maze maze(30, 30);
+		maze.generateSplit();
+		if (!maze.check()) { fprintf(stderr, "Error: generateSplit failed\n"); result = false; }
+		maze.removeCrosses();
+		if (!maze.check()) { fprintf(stderr, "Error: generateSplit failed after remove crosses\n"); result = false; }
+	}
+	{
+		Maze maze(30, 30);
+		maze.generateFractal(Maze::frac_regular);
+		if (!maze.check()) { fprintf(stderr, "Error: generateFractal(frac_regular) failed\n"); result = false; }
+	}
+	{
+		Maze maze(30, 30);
+		maze.generateFractal(Maze::frac_reverse_random_orient_no_cross);
+		if (!maze.check()) { fprintf(stderr, "Error: generateFractal(frac_reverse_random_orient_no_cross) failed\n"); result = false; }
+	}
+	{
+		Maze maze(30, 30);
+		maze.generateFractal(Maze::frac_random_orient_no_cross);
+		if (!maze.check()) { fprintf(stderr, "Error: generateFractal(frac_random_orient_no_cross) failed\n"); result = false; }
+	}
+	{
+		Maze maze(30, 30);
+		maze.generateFractal(Maze::frac_random_orient);
+		if (!maze.check()) { fprintf(stderr, "Error: generateFractal(frac_random_orient) failed\n"); result = false; }
+	}
+	{
+		Maze maze(30, 30);
+		maze.generateFractal(Maze::frac_all_random);
+		if (!maze.check()) { fprintf(stderr, "Error: generateFractal(frac_all_random) failed\n"); result = false; }
+	}
+	{
+		Maze maze(30, 30);
+		maze.generateRandom();
+		if (!maze.check()) { fprintf(stderr, "Error: generateRandom failed\n"); result = false; }
+		maze.removeCrosses();
+		if (!maze.check()) { fprintf(stderr, "Error: generateRandom failed after remove crosses\n"); result = false; }
+	}
+	{
+		Maze maze(10, 10);
+		maze.generateWilson();
+		if (!maze.check()) { fprintf(stderr, "Error: generateWilson failed\n"); result = false; }
+		maze.removeCrosses();
+		if (!maze.check()) { fprintf(stderr, "Error: generateWilson failed after remove crosses\n"); result = false; }
+	}
+	{
+		Maze maze2(6, 6);
+		maze2.generateRecursive();
+		Maze maze(30, 30);
+		maze.stamp(maze2);
+		maze.generateRecursive();
+		if (!maze.check()) { fprintf(stderr, "Error: generateRecursive with stamp failed\n"); result = false; }
+	}
+	{
+		Maze maze2(6, 6);
+		maze2.generateRecursive();
+		Maze maze(30, 30);
+		maze.stamp(maze2);
+		maze.generateRandom();
+		if (!maze.check()) { fprintf(stderr, "Error: generateRandom with stamp failed\n"); result = false; }
+	}
+	{
+		Maze maze2(6, 6);
+		maze2.generateRecursive();
+		Maze maze(30, 30);
+		maze.stamp(maze2);
+		maze.generateWilson();
+		if (!maze.check()) { fprintf(stderr, "Error: generateWilson with stamp failed\n"); result = false; }
+	}
+	{
+		Maze maze2(6, 6);
+		maze2.generateRecursive();
+		Maze maze(30, 30);
+		maze.stamp(maze2);
+		maze.generateTrees();
+		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stamp failed\n"); result = false; }
+	}
+	return result;
+}
+
 int main(int argc, char *argv[])
 {
+	if (!test_all())
+	{
+		fprintf(stderr, "Error: Some test failed\n");
+		return 0;
+	}
 	srand(time(0));
 	//Maze maze(30, 30);
 	//maze.generateRecursive();
@@ -929,7 +1036,8 @@ int main(int argc, char *argv[])
 			//printf("ones dist = %lf %lf\n", max_dist, sum_dist);
 		}
 	}
-*/
+//*/
+/*
 	long min_dist;
 	int min_i = 0;
 	for (int i = 1; ; i++)
@@ -960,5 +1068,5 @@ int main(int argc, char *argv[])
 			maze.svg("Maze2.svg", 5, 5, "red", 1);
 		}
 	}
-
+//*/
 }
