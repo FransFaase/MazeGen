@@ -164,7 +164,7 @@ public:
 			size *= 2;
 		_fractal(i, j, size, type, -1);
 	}
-	void print()
+	void print(bool* visited = 0, int ti = -1, int tj = -1)
 	{
 		for (int j = 0; j < _h; j++)
 		{
@@ -172,7 +172,7 @@ public:
 				printf("+%c", _hasWall(i, j, 3) ? '-' : ' ');
 			printf("+\n");
 			for (int i = 0; i < _w; i++)
-				printf("%c ", _hasWall(i, j, 2) ? '|' : ' ');
+				printf("%c%c", _hasWall(i, j, 2) ? '|' : ' ', i == ti && j == tj ? '*' : visited != 0 && visited[i + _w*j] ? 'x' : ' ');
 			printf("|\n");
 		}
 		for (int i = 0; i < _w; i++)
@@ -350,12 +350,14 @@ public:
 
 	void removeCrosses()
 	{
+		bool* visited = 0;
+		
 		for (int k = _w + _h - 2; k > 0; k--)
 			for (int i = 0, j = k; i < _w; i++, j--)
 				if (0 <= j && j < _h)
 				{
 					int side = rand()%2 == 0;
-					for (int p = 0; p < 2 && _nrWalls(i, j) == 0; p++, side = 1-side)
+					for (int p = 0; p < 4 && _nrWalls(i, j) == 0; p++, side = 1-side)
 					{
 						//printf("Cross at %d, %d %d\n", i, j, p);
 						int start_s;
@@ -408,7 +410,49 @@ public:
 						else
 							left(best_i, best_j) = s_passage;
 					}
+					for (int p = 0; p < 2 && _nrWalls(i, j) == 0; p++, side = 1-side)
+					{
+						if (visited == 0)
+							visited = new bool[_w*_h];
+						for (int i = 0; i < _w*_h; i++)
+							visited[i] = false;
+						int start_s = side == 0 ? 0 : 3, i_s = i, j_s = j;
+						if (side == 0)
+							top(i, j) = s_wall;
+						else
+							left(i, j) = s_wall;
+						for (iterator it(*this, 0, 0, 0); it.more(); it.next())
+							if (it.turn() == 2)
+								visited[it.i() + _w*it.j()] = true;
+						if (visited[i + _w*j])
+						{
+							if (side == 0)
+								j_s--;
+							else
+								i_s--;
+							start_s = (start_s+2)%4;
+						}
+						bool resolved = false;
+						for (iterator it(*this, i_s, j_s, start_s); it.more() && !resolved; it.next())
+							if (it.turn() == 2 && it.i() != i && it.j() != j)
+							{
+								for (int d = 0; d < 4 && !resolved; d++)
+									if (   _wall(it.i(), it.j(), d) == s_wall
+										&& visited[     (it.i() + (d == 0 ? 1 : d == 2 ? -1 : 0))
+										           + _w*(it.j() + (d == 1 ? 1 : d == 3 ? -1 : 0))])
+									{
+										_wall(it.i(), it.j(), d) = s_passage;
+										resolved = true;
+									}
+							}
+						if (!resolved)
+						{
+							top(i, j) = s_passage;
+							left(i, j) = s_passage;
+						}
+					}
 				}
+		delete[] visited;
 	}
 	
 	bool stamp(Maze &pattern)
@@ -572,16 +616,18 @@ public:
 	}
 private:
 	int _depth;
-	state _wall(int i, int j, int d)
+	state& _wall(int i, int j, int d)
 	{
+		static state outer_wall;
+		outer_wall = s_hard_wall;
 		switch((d+4)%4)
 		{
-			case 0: return i >= _w-1 ? s_hard_wall : right(i, j);
-			case 1: return j >= _h-1 ? s_hard_wall : bottom(i, j);
-			case 2: return i <= 0    ? s_hard_wall : left(i, j);
-			case 3: return j <= 0    ? s_hard_wall : top(i, j);
+			case 0: return i >= _w-1 ? outer_wall : right(i, j);
+			case 1: return j >= _h-1 ? outer_wall : bottom(i, j);
+			case 2: return i <= 0    ? outer_wall : left(i, j);
+			case 3: return j <= 0    ? outer_wall : top(i, j);
 		}
-		return s_hard_wall;
+		return outer_wall;
 	}
 	bool _hasWall(int i, int j, int d)
 	{
