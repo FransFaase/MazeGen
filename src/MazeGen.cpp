@@ -163,7 +163,7 @@ public:
 		for (int i = 0; i < (_w-1)*_h; i++)
 			if (_vert[i] != s_hard_wall)
 			{
-				_vert[i] = rand() % nr_all < nr_passages ? s_wall : s_passage;
+				_vert[i] = rand() % nr_all < nr_passages ? s_passage : s_wall;
 				nr_all--;
 				if (_vert[i] == s_passage)
 					nr_passages--;
@@ -171,7 +171,7 @@ public:
 		for (int i = 0; i < _w*(_h-1); i++)
 			if (_horz[i] != s_hard_wall)
 			{
-				_horz[i] = rand() % nr_all < nr_passages ? s_wall : s_passage;
+				_horz[i] = rand() % nr_all < nr_passages ? s_passage : s_wall;
 				nr_all--;
 				if (_horz[i] == s_passage)
 					nr_passages--;
@@ -1034,6 +1034,87 @@ bool test_all()
 	return result;
 }
 
+void statistics()
+{
+	const char *names[] = { "Wil", "Ran", "Dig", "Spl", "Tre", "Rec", "", "", "", "", "" };
+	for (int t = 0; t < 6; t++)
+	{
+		printf("%s ", names[t]);
+		for (int size = 20; size <= 20; size += 10)
+		{
+			Stat stats[22];
+			Stat times;
+			for (int i = 0; i < 500; i++)
+			{
+				Maze maze(size, size);
+				long start = clock();
+				switch(t)
+				{
+					case 0:
+						maze.generateWilson(); break;
+					case 1:
+						maze.generateRandom(); break;
+					case 2:
+						maze.generateDig(); break;
+					case 3:
+						maze.generateSplit(); break;
+					case 4:
+						maze.generateTrees(); break;
+					case 5:
+						maze.generateRecursive(); break;
+					case 6:
+					{
+						Maze maze2(size/5, size/5);
+						maze2.generateRecursive();
+						maze.stamp(maze2);
+						maze.generateDig();
+					} break;
+					case 7:
+						maze.generateFractal(Maze::frac_reverse_random_orient_no_cross); break;
+					case 8:
+						maze.generateFractal(Maze::frac_random_orient_no_cross); break;
+					case 9:
+						maze.generateFractal(Maze::frac_random_orient); break;
+					case 10:
+						maze.generateFractal(Maze::frac_all_random); break;
+				}
+				if (!maze.check())
+					printf("Error\n");
+				times.add((clock() - start)/((double)size * size));
+				maze.calcStats(stats);
+			}
+			//printf("%d: ", size);
+			for (int i = 16; i < 21; i++)
+			{
+				printf(" %5.2lf(%5.2lf)", 100*stats[i].avg(), 100*stats[i].stddev());
+			}
+			printf(" %6.2lf(%5.2lf) #", stats[21].avg(), stats[21].stddev());
+			int ones[4] = { 1, 2, 4, 8 };
+			dist_kind(stats, ones, 4, "ones");
+			int two_corners[4] = { 1+2, 2+4, 4+8, 8+1 };
+			dist_kind(stats, two_corners, 4, "two corners");
+			int two_straight[2] = { 1+4, 2+8 };
+			dist_kind(stats, two_straight, 2, "two straight");
+			int three[4] = { 1+2+4, 2+4+8, 4+8+1, 8+1+2 };
+			dist_kind(stats, three, 4, "three");
+			printf(" %6.2lf(%5.2lf)", times.avg(), times.stddev());
+			printf("\n");
+			//for (int i = 0; i < 4; i++)
+			//	printf(" %5.2lf(%5.2lf)\n", 100*stats[ones[i]].avg(), 100*stats[ones[i]].stddev());
+			//double max_dist = 0;
+			//double sum_dist = 0;
+			//for (int i = 0; i < 3; i++)
+			//	for (int j = i+1; j < 4; j++)
+			//	{
+			//		double dist = Stat::dist(stats[ones[i]], stats[ones[j]]);
+			//		if (dist > max_dist)
+			//			max_dist = dist;
+			//		sum_dist += dist;
+			//	}
+			//printf("ones dist = %lf %lf\n", max_dist, sum_dist);
+		}
+	}
+}
 int main(int argc, char *argv[])
 {
 	if (!test_all())
@@ -1042,6 +1123,7 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 	srand(time(0));
+	statistics();
 	//Maze maze(30, 30);
 	//maze.generateRecursive();
 	//maze.removeCrosses();
@@ -1067,82 +1149,6 @@ int main(int argc, char *argv[])
 	//maze.dump();
 	
 /*	
-	for (int t = 0; t < 10; t++)
-	{
-		printf("%d ", t);
-		for (int size = 20; size <= 20; size += 10)
-		{
-			Stat stats[22];
-			Stat times;
-			for (int i = 0; i < 500; i++)
-			{
-				Maze maze(size, size);
-				long start = clock();
-				switch(t)
-				{
-					case 0:
-						maze.generateRandom(); break;
-					case 1:
-						maze.generateWilson(); break;
-						printf("x");
-					case 2:
-						maze.generateSplit(); break;
-					case 3:
-						maze.generateRecursive(); break;
-					case 4:
-						maze.generateTrees(); break;
-					case 5:
-					{
-						Maze maze2(size/5, size/5);
-						maze2.generateRecursive();
-						maze.stamp(maze2);
-						maze.generateDig();
-					} break;
-					case 6:
-						maze.generateFractal(Maze::frac_reverse_random_orient_no_cross); break;
-					case 7:
-						maze.generateFractal(Maze::frac_random_orient_no_cross); break;
-					case 8:
-						maze.generateFractal(Maze::frac_random_orient); break;
-					case 9:
-						maze.generateFractal(Maze::frac_all_random); break;
-				}
-				if (!maze.check())
-					printf("Error\n");
-				times.add((clock() - start)/((double)size * size));
-				maze.calcStats(stats);
-			}
-			//printf("%d: ", size);
-			//for (int i = 1; i < 21; i++)
-			//{
-			//	printf(" %5.2lf(%5.2lf)", 100*stats[i].avg(), 100*stats[i].stddev());
-			//}
-			int ones[4] = { 1, 2, 4, 8 };
-			dist_kind(stats, ones, 4, "ones");
-			int two_corners[4] = { 1+2, 2+4, 4+8, 8+1 };
-			dist_kind(stats, two_corners, 4, "two corners");
-			int two_straight[2] = { 1+4, 2+8 };
-			dist_kind(stats, two_straight, 2, "two straight");
-			int three[4] = { 1+2+4, 2+4+8, 4+8+1, 8+1+2 };
-			dist_kind(stats, three, 4, "three");
-			printf(" %6.2lf(%5.2lf)", stats[21].avg(), stats[21].stddev());
-			printf(" %6.2lf(%5.2lf)", times.avg(), times.stddev());
-			printf("\n");
-			//for (int i = 0; i < 4; i++)
-			//	printf(" %5.2lf(%5.2lf)\n", 100*stats[ones[i]].avg(), 100*stats[ones[i]].stddev());
-			//double max_dist = 0;
-			//double sum_dist = 0;
-			//for (int i = 0; i < 3; i++)
-			//	for (int j = i+1; j < 4; j++)
-			//	{
-			//		double dist = Stat::dist(stats[ones[i]], stats[ones[j]]);
-			//		if (dist > max_dist)
-			//			max_dist = dist;
-			//		sum_dist += dist;
-			//	}
-			//printf("ones dist = %lf %lf\n", max_dist, sum_dist);
-		}
-	}
 //*/
 /*
 	long min_dist;
