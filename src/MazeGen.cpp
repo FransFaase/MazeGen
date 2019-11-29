@@ -86,7 +86,11 @@ public:
 		for (int i = 0; i < _w*(_h-1); i++)
 			if (_vert[i] != s_hard_wall)
 				_horz[i] = s_passage;
-		fix();
+		_fix();
+	}
+	void generateDig()
+	{
+		_fix();
 	}
 	void generateWilson()
 	{
@@ -148,13 +152,31 @@ public:
 	}
 	void generateRandom()
 	{
+		int nr_all = 0;
 		for (int i = 0; i < (_w-1)*_h; i++)
 			if (_vert[i] != s_hard_wall)
-				_vert[i] = rand() % 2 == 0 ? s_wall : s_passage;
+				nr_all++;
 		for (int i = 0; i < _w*(_h-1); i++)
 			if (_horz[i] != s_hard_wall)
-				_horz[i] = rand() % 2 == 0 ? s_wall : s_passage;
-		fix();
+				nr_all++;
+		int nr_passages = _w * _h - 1;
+		for (int i = 0; i < (_w-1)*_h; i++)
+			if (_vert[i] != s_hard_wall)
+			{
+				_vert[i] = rand() % nr_all < nr_passages ? s_wall : s_passage;
+				nr_all--;
+				if (_vert[i] == s_passage)
+					nr_passages--;
+			}
+		for (int i = 0; i < _w*(_h-1); i++)
+			if (_horz[i] != s_hard_wall)
+			{
+				_horz[i] = rand() % nr_all < nr_passages ? s_wall : s_passage;
+				nr_all--;
+				if (_horz[i] == s_passage)
+					nr_passages--;
+			}
+		_fix();
 	}
 	void generateFractal(int i, int j, frac_type type)
 	{
@@ -493,95 +515,6 @@ public:
 		return count == 2*(_w*_h - 1);
 	}
 	
-	void fix()
-	{
-		char *c_vert = new char[(_w-1)*_h];
-		char *c_horz = new char[_w*(_h-1)];
-		
-		for (;;)
-		{
-			for (int i = 0; i < (_w-1)*_h; i++)
-				c_vert[i] = 0;
-			for (int i = 0; i < _w*(_h-1); i++)
-				c_horz[i] = 0;
-				
-			int count = 0;
-			int i = rand()%_w;
-			int j = rand()%_h;
-			int d = rand()%4;
-			for (;;)
-			{
-				if (_nrWalls(i, j) > 0)
-				{
-					while (!_hasWall(i, j, d))
-						d = (d+1)%4;
-					d = (d+1)%4;
-					break;
-				}
-				if (++i == _w)
-				{
-					i = 0;
-					if (++j == _h)
-						j = 0;
-				}
-			}
-			for (iterator it(*this, i, j, d); it.more(); it.next())
-				if (it.turn() == 0)
-				{
-					switch (it.d())
-					{
-						case 0: c_vert[_h*(it.i()-1) + it.j()]++; break;
-						case 1: c_horz[it.i() + _w*(it.j()-1)]++; break;
-						case 2: c_vert[_h*it.i() + it.j()]++; break;
-						case 3: c_horz[it.i() + _w*it.j()]++; break;
-					}
-					count++;
-				}
-				else if (it.turn() == 2)
-				{
-					switch (it.d())
-					{
-						case 0: if (it.j() > 0) c_horz[it.i() + _w*(it.j()-1)]++; break;
-						case 1: if (it.i() < _w-1) c_vert[_h*it.i() + it.j()]++; break;
-						case 2: if (it.j() < _h-1) c_horz[it.i() + _w*it.j()]++; break;
-						case 3: if (it.i() > 0) c_vert[_h*(it.i()-1) + it.j()]++; break;
-					}
-				}
-			if (count == 2*(_w*_h - 1))
-				break;
-			
-			count = 0;
-			for (int i = 0; i < (_w-1)*_h; i++)
-				if (c_vert[i] == 1 && _vert[i] != s_hard_wall)
-					count++;
-			for (int i = 0; i < _w*(_h-1); i++)
-				if (c_horz[i] == 1 && _horz[i] != s_hard_wall)
-					count++;
-			//printf(" %d", count);
-			if (count > 0)
-			{
-				int r = count == 1 ? 0 : rand() % count;
-				count = 0;
-				for (int i = 0; i < (_w-1)*_h; i++)
-					if (c_vert[i] == 1 && _vert[i] != s_hard_wall)
-					{
-						if (count == r)
-							_vert[i] = (_vert[i] == s_wall) ? s_passage : s_wall;
-						count++;
-					}
-				for (int i = 0; i < _w*(_h-1); i++)
-					if (c_horz[i] == 1 && _horz[i] != s_hard_wall)
-					{
-						if (count == r)
-							_horz[i] = (_horz[i] == s_wall) ? s_passage : s_wall;
-						count++;
-					}
-			}
-		}
-		
-		delete[] c_vert;
-		delete[] c_horz;
-	}
 	void svg(const char *filename, double wall_width, double hall_width, const char *color, double stroke_width)
 	{
 		FILE *f = fopen(filename, "wt");
@@ -810,6 +743,95 @@ private:
 		if (ft != frac_all_random) return max;
 		return min + (min < max ? rand()%(max+1 - min) : 0);
 	}
+	void _fix()
+	{
+		char *c_vert = new char[(_w-1)*_h];
+		char *c_horz = new char[_w*(_h-1)];
+		
+		for (;;)
+		{
+			for (int i = 0; i < (_w-1)*_h; i++)
+				c_vert[i] = 0;
+			for (int i = 0; i < _w*(_h-1); i++)
+				c_horz[i] = 0;
+				
+			int count = 0;
+			int i = rand()%_w;
+			int j = rand()%_h;
+			int d = rand()%4;
+			for (;;)
+			{
+				if (_nrWalls(i, j) > 0)
+				{
+					while (!_hasWall(i, j, d))
+						d = (d+1)%4;
+					d = (d+1)%4;
+					break;
+				}
+				if (++i == _w)
+				{
+					i = 0;
+					if (++j == _h)
+						j = 0;
+				}
+			}
+			for (iterator it(*this, i, j, d); it.more(); it.next())
+				if (it.turn() == 0)
+				{
+					switch (it.d())
+					{
+						case 0: c_vert[_h*(it.i()-1) + it.j()]++; break;
+						case 1: c_horz[it.i() + _w*(it.j()-1)]++; break;
+						case 2: c_vert[_h*it.i() + it.j()]++; break;
+						case 3: c_horz[it.i() + _w*it.j()]++; break;
+					}
+					count++;
+				}
+				else if (it.turn() == 2)
+				{
+					switch (it.d())
+					{
+						case 0: if (it.j() > 0) c_horz[it.i() + _w*(it.j()-1)]++; break;
+						case 1: if (it.i() < _w-1) c_vert[_h*it.i() + it.j()]++; break;
+						case 2: if (it.j() < _h-1) c_horz[it.i() + _w*it.j()]++; break;
+						case 3: if (it.i() > 0) c_vert[_h*(it.i()-1) + it.j()]++; break;
+					}
+				}
+			if (count == 2*(_w*_h - 1))
+				break;
+			
+			count = 0;
+			for (int i = 0; i < (_w-1)*_h; i++)
+				if (c_vert[i] == 1 && _vert[i] != s_hard_wall)
+					count++;
+			for (int i = 0; i < _w*(_h-1); i++)
+				if (c_horz[i] == 1 && _horz[i] != s_hard_wall)
+					count++;
+			//printf(" %d", count);
+			if (count > 0)
+			{
+				int r = rand() % count;
+				count = 0;
+				for (int i = 0; i < (_w-1)*_h; i++)
+					if (c_vert[i] == 1 && _vert[i] != s_hard_wall)
+					{
+						if (count == r)
+							_vert[i] = (_vert[i] == s_wall) ? s_passage : s_wall;
+						count++;
+					}
+				for (int i = 0; i < _w*(_h-1); i++)
+					if (c_horz[i] == 1 && _horz[i] != s_hard_wall)
+					{
+						if (count == r)
+							_horz[i] = (_horz[i] == s_wall) ? s_passage : s_wall;
+						count++;
+					}
+			}
+		}
+		
+		delete[] c_vert;
+		delete[] c_horz;
+	}
 	class _Cell
 	{
 	public:
@@ -908,6 +930,20 @@ bool test_all()
 	}
 	{
 		Maze maze(30, 30);
+		maze.generateTrees();
+		if (!maze.check()) { fprintf(stderr, "Error: generateTrees failed\n"); result = false; }
+		maze.removeCrosses();
+		if (!maze.check()) { fprintf(stderr, "Error: generateTrees failed after remove crosses\n"); result = false; }
+	}
+	{
+		Maze maze(30, 30);
+		maze.generateDig();
+		if (!maze.check()) { fprintf(stderr, "Error: generateDig failed\n"); result = false; }
+		maze.removeCrosses();
+		if (!maze.check()) { fprintf(stderr, "Error: generateDig failed after remove crosses\n"); result = false; }
+	}
+	{
+		Maze maze(30, 30);
 		maze.generateFractal(Maze::frac_regular);
 		if (!maze.check()) { fprintf(stderr, "Error: generateFractal(frac_regular) failed\n"); result = false; }
 	}
@@ -985,6 +1021,16 @@ bool test_all()
 		maze.removeCrosses();
 		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stamp failed after removing crosses\n"); result = false; }
 	}
+	{
+		Maze maze2(6, 6);
+		maze2.generateRecursive();
+		Maze maze(30, 30);
+		maze.stamp(maze2);
+		maze.generateDig();
+		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stamp failed\n"); result = false; }
+		maze.removeCrosses();
+		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stamp failed after removing crosses\n"); result = false; }
+	}
 	return result;
 }
 
@@ -1008,7 +1054,7 @@ int main(int argc, char *argv[])
 	//Maze maze2(6, 6);
 	//maze2.generateRecursive();
 	//maze.stamp(maze2);
-	//maze.fix();
+	//maze.generateDig();
 	//maze.generateRecursive();
 	//maze.generateTrees();
 	//maze.generateRandom();
@@ -1050,7 +1096,7 @@ int main(int argc, char *argv[])
 						Maze maze2(size/5, size/5);
 						maze2.generateRecursive();
 						maze.stamp(maze2);
-						maze.fix();
+						maze.generateDig();
 					} break;
 					case 6:
 						maze.generateFractal(Maze::frac_reverse_random_orient_no_cross); break;
