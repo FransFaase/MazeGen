@@ -515,7 +515,7 @@ public:
 		return count == 2*(_w*_h - 1);
 	}
 	
-	void svg(const char *filename, double wall_width, double hall_width, const char *color, double stroke_width)
+	void svg(const char *filename, double wall_width, double hall_width, const char *color, double stroke_width, bool with_border)
 	{
 		FILE *f = fopen(filename, "wt");
 		if (f == 0)
@@ -525,15 +525,29 @@ public:
 		}
 		fprintf(f, "<svg width=\"%.0f\" height=\"%.0f\" xmlns=\"http://www.w3.org/2000/svg\">\n",
 				(wall_width+hall_width)*(_w+1), (wall_width+hall_width)*(_h+1));
-		fprintf(f, "<path d=\"M%.2lf %.2lf\n", hall_width/2, hall_width/2);
-		fprintf(f, "L %.2lf %.2lf\n", hall_width/2 + (_w+1)*wall_width + _w*hall_width, hall_width/2);
-		fprintf(f, "L %.2lf %.2lf\n", hall_width/2 + (_w+1)*wall_width + _w*hall_width, hall_width/2 + (_h+1)*wall_width + _h*hall_width);
-		fprintf(f, "L %.2lf %.2lf\n", hall_width/2, hall_width/2 + (_h+1)*wall_width + _h*hall_width);
-		fprintf(f, "Z\" stroke=\"%s\" stroke-width=\"%.2lf\" fill-opacity=\"0.0\"/>\n", color, stroke_width);
+		if (with_border)
+		{
+			fprintf(f, "<path d=\"M%.2lf %.2lf\n", hall_width/2, hall_width/2);
+			fprintf(f, "L %.2lf %.2lf\n", hall_width/2 + (_w+1)*wall_width + _w*hall_width, hall_width/2);
+			fprintf(f, "L %.2lf %.2lf\n", hall_width/2 + (_w+1)*wall_width + _w*hall_width, hall_width/2 + (_h+1)*wall_width + _h*hall_width);
+			fprintf(f, "L %.2lf %.2lf\n", hall_width/2, hall_width/2 + (_h+1)*wall_width + _h*hall_width);
+			fprintf(f, "Z\" stroke=\"%s\" stroke-width=\"%.2lf\" fill-opacity=\"0.0\"/>\n", color, stroke_width);
+		}
 		fprintf(f, "<path d=\"M%.2lf %.2lf\n",
 			(hall_width + wall_width) - hall_width/2,
 			(hall_width + wall_width) - hall_width/2);
-		for (iterator it(*this, 0, 0, 0); it.more(); it.next())
+		// Find first cell with not only walls
+		int i = 0;
+		int j = 0;
+		while (j < _h && _nrWalls(i, j) == 0)
+		{
+			if (++i == _w)
+			{
+				i = 0;
+				j++;
+			}
+		}
+		for (iterator it(*this, i, j, 0); it.more(); it.next())
 		{
 			if (it.turn() == -1) 
 				fprintf(f, "L %.2lf %.2lf\n",
@@ -1145,7 +1159,7 @@ int main(int argc, char *argv[])
 	//maze.printAverageDist();
 	//if (!maze.check())
 	//	printf("Incorrect\n");
-	//maze.svg("Maze.svg", 2, 8, "red", 1);
+	//maze.svg("Maze.svg", 2, 8, "red", 1, true);
 	//maze.dump();
 	
 /*	
@@ -1177,8 +1191,8 @@ int main(int argc, char *argv[])
 			maze.stamp(maze2);
 			maze.generateWilson();
 			printf("\nDist = %ld\n", maze.calcDist());
-			maze.svg("Maze.svg", 2, 8, "red", 1);
-			maze.svg("Maze2.svg", 5, 5, "red", 1);
+			maze.svg("Maze.svg", 2, 8, "red", 1, true);
+			maze.svg("Maze2.svg", 5, 5, "red", 1, true);
 		}
 	}
 //*/
