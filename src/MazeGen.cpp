@@ -504,7 +504,102 @@ public:
 				}
 		return true;
 	}
+
+	bool fillPartial(Maze &maze, double factor)
+	{
+		if (_w != maze._w || _h != maze._h)
+			return false;
 		
+		// Determine the height of each cell
+		int *height = new int[_w*_h];
+		for (int i = 0; i < _w; i++)
+			for (int j = 0; j < _h; j++)
+				height[i + _w*j] = _h*_w;
+		bool go = true;
+		int h;
+		for (h = 1; go; h++)
+		{
+			go = false;
+			//for (int j = 0; j < _h; j++)
+			//{
+			//	for (int i = 0; i < _w; i++)
+			//		printf("%4d", height[i + _w*j]);
+			//	printf("\n");
+			//}
+			printf("\n");
+			for (int j = 0; j < _h; j++)
+				for (int i = 0; i < _w; i++)
+					if (height[i + _w*j] >= h)
+					{
+						int open = 0;
+						if (i < _w-1 && maze.right(i, j)  == s_passage && height[(i+1) + _w*j] >= h) open++;
+						if (j < _h-1 && maze.bottom(i, j) == s_passage && height[i + _w*(j+1)] >= h) open++;
+						if (i > 0    && maze.left(i, j)   == s_passage && height[(i-1) + _w*j] >= h) open++;
+						if (j > 0    && maze.top(i, j)    == s_passage && height[i + _w*(j-1)] >= h) open++;
+						if (open == 1)
+						{
+							height[i + _w*j] = h;
+							go = true;
+						}
+					}
+		}
+		for (int i = 0; i < _w; i++)
+			for (int j = 0; j < _h; j++)
+				if (height[i + _w*j] > h)
+					height[i + _w*j] = h;
+
+		go = true;
+				for (int h = 1; go; h++)
+		{
+			//for (int j = 0; j < _h; j++)
+			//{
+			//	for (int i = 0; i < _w; i++)
+			//		printf("%3d", height[i + _w*j]);
+			//	printf("\n");
+			//}
+			//printf("\n");
+			go = false;
+			for (int i = 0; i < _w-1; i++)
+				for (int j = 0; j < _h; j++)
+					if (maze.right(i, j) == s_passage)
+					{
+						int &l = height[i + _w*j];
+						int &r = height[(i+1) + _w*j];
+						     if (r < l - 1) { r = l - 1; go = true; }
+						else if (l < r - 1) { l = r - 1; go = true; }
+					}
+			for (int i = 0; i < _w; i++)
+				for (int j = 0; j < _h-1; j++)
+					if (maze.bottom(i, j) == s_passage)
+					{
+						int &t = height[i + _w*j];
+						int &b = height[i + _w*(j+1)];
+						     if (b < t - 1) { b = t - 1; go = true; }
+						else if (t < b - 1) { t = b - 1; go = true; }
+					}
+		}
+		// Determine the heights that should be included
+		int nr_excluded = (double)(_w*_h) * (1 - factor);
+		int nr = 0;
+		for (h = 1; nr < nr_excluded; h++)
+			for (int i = 0; i < _w; i++)
+				for (int j = 0; j < _h; j++)
+					if (height[i + _w*j] == h)
+						nr++;
+		// copy the parts above that height
+		for (int i = 0; i < _w-1; i++)
+			for (int j = 0; j < _h; j++)
+				if (maze.right(i, j) == s_passage && height[i + _w*j] >= h && height[(i+1) + _w*j] >= h)
+					right(i, j) = s_passage;
+		for (int i = 0; i < _w; i++)
+			for (int j = 0; j < _h-1; j++)
+				if (maze.bottom(i, j) == s_passage && height[i + _w*j] >= h && height[i + _w*(j+1)] >= h)
+					bottom(i, j) = s_passage;
+
+		delete[] height;
+		return true;
+	}
+
 	bool check()
 	{
 		int count = 0;
@@ -533,13 +628,10 @@ public:
 			fprintf(f, "L %.2lf %.2lf\n", hall_width/2, hall_width/2 + (_h+1)*wall_width + _h*hall_width);
 			fprintf(f, "Z\" stroke=\"%s\" stroke-width=\"%.2lf\" fill-opacity=\"0.0\"/>\n", color, stroke_width);
 		}
-		fprintf(f, "<path d=\"M%.2lf %.2lf\n",
-			(hall_width + wall_width) - hall_width/2,
-			(hall_width + wall_width) - hall_width/2);
 		// Find first cell with not only walls
 		int i = 0;
 		int j = 0;
-		while (j < _h && _nrWalls(i, j) == 0)
+		while (j < _h && _nrWalls(i, j) == 4)
 		{
 			if (++i == _w)
 			{
@@ -547,6 +639,9 @@ public:
 				j++;
 			}
 		}
+		fprintf(f, "<path d=\"M%.2lf %.2lf\n",
+			(hall_width + wall_width)*(i+1) - hall_width/2,
+			(hall_width + wall_width)*(j+1) - hall_width/2);
 		for (iterator it(*this, i, j, 0); it.more(); it.next())
 		{
 			if (it.turn() == -1) 
@@ -1137,7 +1232,7 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 	srand(time(0));
-	statistics();
+	//statistics();
 	//Maze maze(30, 30);
 	//maze.generateRecursive();
 	//maze.removeCrosses();
@@ -1161,6 +1256,22 @@ int main(int argc, char *argv[])
 	//	printf("Incorrect\n");
 	//maze.svg("Maze.svg", 2, 8, "red", 1, true);
 	//maze.dump();
+	Maze maze(30, 30);
+	maze.generateWilson();
+	maze.print();
+	maze.svg("Maze.svg", 4, 4, "red", 1, true);
+	Maze maze2(30, 30);
+	maze2.fillPartial(maze, 0.7);
+	maze2.print();
+	maze2.svg("Maze2.svg", 4, 4, "red", 1, true);
+	Maze maze3(30, 30);
+	maze3.fillPartial(maze, 0.4);
+	maze3.print();
+	maze3.svg("Maze3.svg", 4, 4, "red", 1, true);
+	Maze maze4(30, 30);
+	maze4.fillPartial(maze, 0.15);
+	maze4.print();
+	maze4.svg("Maze4.svg", 4, 4, "red", 1, true);
 	
 /*	
 //*/
