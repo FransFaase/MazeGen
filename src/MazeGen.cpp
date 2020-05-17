@@ -94,15 +94,24 @@ public:
 	}
 	void generateWilson()
 	{
+		// https://en.wikipedia.org/wiki/Maze_generation_algorithm#Wilson's_algorithm
+		
+	    // Algorithm assums that all traversals are marked as s_wall.
+	
+		// state is used for recording walking direction from a room (using 0 to 3)
+		// and to record which rooms are included (using 4).
 		int* state = new int[_w*_h];
 		for (int i = 0; i < _w*_h; i++)
 			state[i] = 0;
-			
+		// Mark random room as included
 		state[(rand()%_w) + _w*(rand()%_h)] = 4;
+
+		// While there are still rooms not included
 		int to_go = _w*_h - 1;
 		while (to_go > 0)
 		{
 			//printf("to go %d: ", to_go);
+			// Pick a random room that is not yet included
 			int s = rand()%to_go;
 			int s_i = -1;
 			int s_j = 0;
@@ -113,6 +122,8 @@ public:
 						s_i = i;
 						s_j = j;
 					}
+			// Perform a random walk from this room until
+			// an included room is found, warking the directions
 			int i = s_i;
 			int j = s_j;
 			//printf("start %d,%d: ", i, j);
@@ -132,6 +143,9 @@ public:
 				}
 			}
 			//printf("found\n");
+			// Start from the initial room, following the
+			// marked directions, marking them as included
+			// and making all traversals into a passage 
 			i = s_i;
 			j = s_j;
 			while (state[i + _w*j] != 4)
