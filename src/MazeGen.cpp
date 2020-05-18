@@ -123,7 +123,7 @@ public:
 						s_j = j;
 					}
 			// Perform a random walk from this room until
-			// an included room is found, warking the directions
+			// an included room is found, marking the directions
 			int i = s_i;
 			int j = s_j;
 			//printf("start %d,%d: ", i, j);
@@ -491,7 +491,7 @@ public:
 		delete[] visited;
 	}
 	
-	bool stamp(Maze &pattern)
+	bool stampStreched(Maze &pattern)
 	{
 		if (pattern._w > _w || pattern._h > _h)
 			return false;
@@ -517,6 +517,20 @@ public:
 						bottom(k, b) = s_hard_wall;
 				}
 		return true;
+	}
+
+	bool stampAt(Maze &pattern, int x, int y)
+	{
+		if (x < 0 || x + pattern._w > _w || y < 0 || y + pattern._h > _h)
+			return false;
+		for (int i = 0; i < pattern._w-1; i++)
+			for (int j = 0; j < pattern._h; j++)
+				if (pattern.right(i, j) >= s_wall)
+					right(x + i, y + j) = s_hard_wall;
+		for (int i = 0; i < pattern._w; i++)
+			for (int j = 0; j < pattern._h-1; j++)
+				if (pattern.bottom(i, j) >= s_wall)
+					bottom(x + i, y + j) = s_hard_wall;
 	}
 
 	bool fillPartial(Maze &maze, double factor)
@@ -1108,51 +1122,51 @@ bool test_all()
 		Maze maze2(6, 6);
 		maze2.generateRecursive();
 		Maze maze(30, 30);
-		maze.stamp(maze2);
+		maze.stampStreched(maze2);
 		maze.generateRecursive();
-		if (!maze.check()) { fprintf(stderr, "Error: generateRecursive with stamp failed\n"); result = false; }
+		if (!maze.check()) { fprintf(stderr, "Error: generateRecursive with stampStreched failed\n"); result = false; }
 		maze.removeCrosses();
-		if (!maze.check()) { fprintf(stderr, "Error: generateRecursive with stamp failed after removing crosses\n"); result = false; }
+		if (!maze.check()) { fprintf(stderr, "Error: generateRecursive with stampStreched failed after removing crosses\n"); result = false; }
 	}
 	{
 		Maze maze2(6, 6);
 		maze2.generateRecursive();
 		Maze maze(30, 30);
-		maze.stamp(maze2);
+		maze.stampStreched(maze2);
 		maze.generateRandom();
-		if (!maze.check()) { fprintf(stderr, "Error: generateRandom with stamp failed\n"); result = false; }
+		if (!maze.check()) { fprintf(stderr, "Error: generateRandom with stampStreched failed\n"); result = false; }
 		maze.removeCrosses();
-		if (!maze.check()) { fprintf(stderr, "Error: generateRandom with stamp failed after removing crosses\n"); return false; }
+		if (!maze.check()) { fprintf(stderr, "Error: generateRandom with stampStreched failed after removing crosses\n"); return false; }
 	}
 	{
 		Maze maze2(6, 6);
 		maze2.generateRecursive();
 		Maze maze(30, 30);
-		maze.stamp(maze2);
+		maze.stampStreched(maze2);
 		maze.generateWilson();
-		if (!maze.check()) { fprintf(stderr, "Error: generateWilson with stamp failed\n"); result = false; }
+		if (!maze.check()) { fprintf(stderr, "Error: generateWilson with stampStreched failed\n"); result = false; }
 		maze.removeCrosses();
-		if (!maze.check()) { fprintf(stderr, "Error: generateWilson with stamp failed after removing crosses\n"); result = false; }
+		if (!maze.check()) { fprintf(stderr, "Error: generateWilson with stampStreched failed after removing crosses\n"); result = false; }
 	}
 	{
 		Maze maze2(6, 6);
 		maze2.generateRecursive();
 		Maze maze(30, 30);
-		maze.stamp(maze2);
+		maze.stampStreched(maze2);
 		maze.generateTrees();
-		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stamp failed\n"); result = false; }
+		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stampStreched failed\n"); result = false; }
 		maze.removeCrosses();
-		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stamp failed after removing crosses\n"); result = false; }
+		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stampStreched failed after removing crosses\n"); result = false; }
 	}
 	{
 		Maze maze2(6, 6);
 		maze2.generateRecursive();
 		Maze maze(30, 30);
-		maze.stamp(maze2);
+		maze.stampStreched(maze2);
 		maze.generateDig();
-		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stamp failed\n"); result = false; }
+		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stampStreched failed\n"); result = false; }
 		maze.removeCrosses();
-		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stamp failed after removing crosses\n"); result = false; }
+		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stampStreched failed after removing crosses\n"); result = false; }
 	}
 	return result;
 }
@@ -1189,7 +1203,7 @@ void statistics()
 					{
 						Maze maze2(size/5, size/5);
 						maze2.generateRecursive();
-						maze.stamp(maze2);
+						maze.stampStreched(maze2);
 						maze.generateDig();
 					} break;
 					case 7:
@@ -1258,7 +1272,7 @@ int main(int argc, char *argv[])
 	//maze.generateFractal(Maze::frac_all_random);
 	//Maze maze2(6, 6);
 	//maze2.generateRecursive();
-	//maze.stamp(maze2);
+	//maze.stampStreched(maze2);
 	//maze.generateDig();
 	//maze.generateRecursive();
 	//maze.generateTrees();
@@ -1270,23 +1284,26 @@ int main(int argc, char *argv[])
 	//	printf("Incorrect\n");
 	//maze.svg("Maze.svg", 2, 8, "red", 1, true);
 	//maze.dump();
-	Maze maze(30, 30);
+	Maze maze(5, 5);
 	maze.generateWilson();
 	maze.print();
-	maze.svg("Maze.svg", 4, 4, "red", 1, true);
-	Maze maze2(30, 30);
-	maze2.fillPartial(maze, 0.7);
+	maze.svg("Maze4.svg", 4, 4, "red", 1, false);
+	Maze maze2(15, 15);
+	maze2.stampAt(maze, 5, 5);
 	maze2.print();
-	maze2.svg("Maze2.svg", 4, 4, "red", 1, true);
-	Maze maze3(30, 30);
-	maze3.fillPartial(maze, 0.4);
+	maze2.generateWilson();
+	maze2.print();
+	maze2.svg("Maze3.svg", 4, 4, "red", 1, false);
+	Maze maze3(25, 25);
+	maze3.stampAt(maze2, 5, 5);
+	maze3.generateWilson();
 	maze3.print();
-	maze3.svg("Maze3.svg", 4, 4, "red", 1, true);
-	Maze maze4(30, 30);
-	maze4.fillPartial(maze, 0.15);
+	maze3.svg("Maze2.svg", 4, 4, "red", 1, false);
+	Maze maze4(35, 35);
+	maze4.stampAt(maze3, 5, 5);
+	maze4.generateWilson();
 	maze4.print();
-	maze4.svg("Maze4.svg", 4, 4, "red", 1, true);
-	
+	maze4.svg("Maze1.svg", 4, 4, "red", 1, true);
 /*	
 //*/
 /*
@@ -1298,7 +1315,7 @@ int main(int argc, char *argv[])
 		Maze maze2(6, 6);
 		maze2.generateRecursive();
 		Maze maze(30, 30);
-		maze.stamp(maze2);
+		maze.stampStreched(maze2);
 		maze.generateWilson();
 		long dist = maze.calcDist();
 		printf(" %ld\n", dist);
@@ -1313,7 +1330,7 @@ int main(int argc, char *argv[])
 			Maze maze2(6, 6);
 			maze2.generateRecursive();
 			Maze maze(30, 30);
-			maze.stamp(maze2);
+			maze.stampStreched(maze2);
 			maze.generateWilson();
 			printf("\nDist = %ld\n", maze.calcDist());
 			maze.svg("Maze.svg", 2, 8, "red", 1, true);
