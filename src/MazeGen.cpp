@@ -100,14 +100,28 @@ public:
 	
 		// state is used for recording walking direction from a room (using 0 to 3)
 		// and to record which rooms are included (using 4).
+		int to_go = _w*_h;
 		int* state = new int[_w*_h];
-		for (int i = 0; i < _w*_h; i++)
-			state[i] = 0;
-		// Mark random room as included
-		state[(rand()%_w) + _w*(rand()%_h)] = 4;
+		for (int i = 0; i < _w; i++)
+			for (int j = 0; j < _h; j++)
+			{
+				state[i + _w*j] = 0;
+				for (int d = 0; d < 4; d++)
+					if (_wall(i, j, d) == s_passage)
+					{
+						state[i + _w*j] = 4;
+						to_go--;
+						break;
+					}
+			}
+		if (to_go == _w*_h)
+		{
+			// Mark random room as included
+			state[(rand()%_w) + _w*(rand()%_h)] = 4;
+			to_go--;
+		}
 
 		// While there are still rooms not included
-		int to_go = _w*_h - 1;
 		while (to_go > 0)
 		{
 			//printf("to go %d: ", to_go);
@@ -205,10 +219,10 @@ public:
 		for (int j = 0; j < _h; j++)
 		{
 			for (int i = 0; i < _w; i++)
-				printf("+%c", _hasWall(i, j, 3) ? '-' : ' ');
+				printf("+%c", _hasWall(i, j, 3) ? (_wall(i, j, 3) == s_wall ? '-' : '=') : ' ');
 			printf("+\n");
 			for (int i = 0; i < _w; i++)
-				printf("%c%c", _hasWall(i, j, 2) ? '|' : ' ', i == ti && j == tj ? '*' : visited != 0 && visited[i + _w*j] ? 'x' : ' ');
+				printf("%c%c", _hasWall(i, j, 2) ? (_wall(i, j, 2) == s_wall ? ':' : '|') : ' ', i == ti && j == tj ? '*' : visited != 0 && visited[i + _w*j] ? 'x' : ' ');
 			printf("|\n");
 		}
 		for (int i = 0; i < _w; i++)
@@ -525,12 +539,10 @@ public:
 			return false;
 		for (int i = 0; i < pattern._w-1; i++)
 			for (int j = 0; j < pattern._h; j++)
-				if (pattern.right(i, j) >= s_wall)
-					right(x + i, y + j) = s_hard_wall;
+				right(x + i, y + j) = pattern.right(i, j) >= s_wall ? s_hard_wall : s_passage;
 		for (int i = 0; i < pattern._w; i++)
 			for (int j = 0; j < pattern._h-1; j++)
-				if (pattern.bottom(i, j) >= s_wall)
-					bottom(x + i, y + j) = s_hard_wall;
+				bottom(x + i, y + j) = pattern.bottom(i, j) >= s_wall ? s_hard_wall : s_passage;
 	}
 
 	bool fillPartial(Maze &maze, double factor)
@@ -1168,6 +1180,15 @@ bool test_all()
 		maze.removeCrosses();
 		if (!maze.check()) { fprintf(stderr, "Error: generateTrees with stampStreched failed after removing crosses\n"); result = false; }
 	}
+	{
+		Maze maze(5, 5);
+		maze.generateRecursive();
+		Maze maze2(15, 15);
+		maze2.stampAt(maze, 5, 5);
+		maze2.generateWilson();
+		if (!maze2.check()) { fprintf(stderr, "Error: generateWilson with stampAt failed\n"); result = false; }
+	}
+
 	return result;
 }
 
