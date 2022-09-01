@@ -543,6 +543,7 @@ public:
 		for (int i = 0; i < pattern._w; i++)
 			for (int j = 0; j < pattern._h-1; j++)
 				bottom(x + i, y + j) = pattern.bottom(i, j) >= s_wall ? s_hard_wall : s_passage;
+		return true;
 	}
 
 	bool fillPartial(Maze &maze, double factor)
